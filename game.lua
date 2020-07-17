@@ -164,35 +164,14 @@ function spr_iso(index,x,y,colorkey,scale,flip,rotate,w,h,z)
 	pre_spr(index,x-camera.x,y-camera.y,colorkey,scale,flip,rotate,w,h,z)
 end
 
+--- game logic
 -- player
 
 local player={
 	x=2,y=2,
-	sprite=257
+	sprite=257,
+	facing=0
 }
-
-function draw_player(p)
-	local ix,iy=calc_iso(p.x,p.y)
-	spr_iso(p.sprite,
-		ix,iy,
-		0,1,0,0,2,3,1)
-end
-
-function update_player(p)
-	if btnp(0,20,5) then
-		p.y=p.y-1
-	elseif btnp(1,20,5) then
-		p.y=p.y+1
-	end
-	
-	if btnp(2,20,5) then
-		p.x=p.x-1
-	elseif btnp(3,20,5) then
-		p.x=p.x+1
-	end
-end
-
---- game logic
 
 -- turn handling
 local turn_id=1
@@ -242,16 +221,20 @@ function move_player(p)
 
 	if btnp(0) and not is_solid(p.x,p.y-1) then
 		p.y=p.y-1
+		p.facing=0
 		did_move=true
 	elseif btnp(1) and not is_solid(p.x,p.y+1) then
 		p.y=p.y+1
+		p.facing=1
 		did_move=true
 	end
 	if btnp(2) and not is_solid(p.x-1,p.y) then
 		p.x=p.x-1	
+		p.facing=1
 		did_move=true
 	elseif btnp(3) and not is_solid(p.x+1,p.y) then
 		p.x=p.x+1
+		p.facing=0
 		did_move=true
 	end
 
@@ -384,7 +367,7 @@ function draw_player(p)
 	local ix,iy=calc_iso(p.x,p.y)
 	spr_iso(p.sprite,
 		ix,iy,
-		0,1,0,0,2,3,1)
+		0,1,p.facing,0,2,3,1)
 end
 
 function create_enemy(x,y)
