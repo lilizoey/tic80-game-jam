@@ -3,169 +3,224 @@
 -- desc:   short description
 -- script: lua
 
-function is_dyn(x,y)
-		return fget(mget(x,y),0)
+-- constants
+
+local SOLID_FLAG = 1
+
+-- custom drawing
+
+function init_node(e)
+	return {l=nil,r=nil,e=e}
 end
 
-local dirs={
-	{0,-1},
-	{1,0},
-	{0,1},
-	{-1,0}
-}
-
-function remap(tile,x,y)
-	if not fget(tile,0) then
-		return
-	end
-	--tile=tile + 3*((y//3)%4) -- season test
-	local c=0
-	for k,d in pairs(dirs) do
-		if is_dyn(x+d[1],y+d[2]) then c=c+1 end
-	end 
-	if c==0 or c==4 then
-		return tile
-	elseif c==1 then
-		local rot=2
-		for k,d in pairs(dirs) do
-			if is_dyn(x+d[1],y+d[2]) then
-				return tile-1,0,rot%4
-			end
-			rot=rot+1
+function insert(t,e)
+	if e.z<t.e.z then
+		if not t.l then
+			t.l=init_node(e)
+		else
+			insert(t.l,e)
 		end
-	elseif c==3 then
-		local rot=0
-		for k,d in pairs(dirs) do
-			if not is_dyn(x+d[1],y+d[2]) then
-				return tile-1,0,rot%4
-			end
-			rot=rot+1
+	else
+		if not t.r then
+			t.r=init_node(e)
+		else
+			insert(t.r,e)
 		end
-	elseif c==2 then
-		local s=0
-		local rot=-1
-		for k,d in pairs(dirs) do
-			if s==0 and not is_dyn(x+d[1],y+d[2]) then
-				s=1
-			end
-			if s==1 and is_dyn(x+d[1],y+d[2]) then
-				return tile-2,0,rot%4
-			end
-			rot=rot+1
+	end
+end
+
+function tree_list(t)
+	function inner(t,a)
+		if not t then
+			return a
 		end
-		return tile-2,0,rot%4
+		inner(t.l,a)
+		table.insert(a,t.e)
+		inner(t.r,a)
+		return a
 	end
-	
-	return tile
+	return inner(t,{})
 end
 
-local player={
-	x=0,y=0,
-	dx=0,dy=0,
-	w=16,h=16,
-	sprite=257,
-	facing="r",
-	state="idle"
-}
+local drawing_tree=nil
 
-local camera={
-	x=0,y=0,
-	w=240,h=136
-}
-
-local flip_map={r=0,l=1}
-local grav=90
-local speed=60
-local jump=90
-
-function draw(c)
-	spr(
-		c.sprite,
-		c.x-(camera.x-camera.w/2),
-		c.y-(camera.y-camera.h/2),
-		0,
-		1,flip_map[c.facing],0,
-		c.w//2,c.h//2
-	)
+function start_draw()
+ drawing_tree=init_node({id=nil,z=136/2})
 end
 
-function is_solid(x,y)
-	return mget(x,y) > 0 and mget(x,y) < 100
-end
-
-function update_player(p)
-	p.dy=p.dy+grav/60
-
-	-- if hits floor
-	if is_solid(p.x//8,(p.y+p.dy/60+p.h)//8) or
-	   is_solid((p.x+p.h)//8,(p.y+p.dy/60+p.h)//8) then
-		p.dy = 0
-	end
-	
-	-- if hits roof
-	if is_solid(p.x//8,(p.y+p.dy/60)//8) or
-	   is_solid((p.x+p.h)//8,(p.y+p.dy/60)//8) then
-		p.dy = 0
-	end
-	
-	p.y=p.y+p.dy/60
-
-	if btn(3) then
-		p.dx=speed
-	elseif btn(2) then
-		p.dx=-speed
-	else
-		p.dx=0
-	end
-	
-	if btnp(0) then
-		p.dy=-jump
-	end
-
-	if is_solid((p.x+p.dx/60)//8,(p.y+p.dy/60)//8) or
-	   is_solid((p.x+p.dx/60+p.w)//8,(p.y+p.dy/60)//8) or
-	   is_solid((p.x+p.dx/60)//8,(p.y+p.dy/60+p.h)//8) or
-	   is_solid((p.x+p.dx/60+p.w)//8,(p.y+p.dy/60+p.h)//8) then
-		p.dx=0
-	end	
-	p.x=p.x+p.dx/60
-end
-
-function update_camera(c,p)
-	if p.x < c.w/2 then
-		c.x=c.w/2
-	else
-		c.x=p.x
-	end
-	if p.y < c.h/2 then
-		c.y=c.h/2
-	else
-		c.y=p.y
+function final_draw()
+	for k,e in pairs(tree_list(drawing_tree)) do
+		if e.id then
+			spr(e.id,e.x,e.y,e.colorkey,e.scale,e.flip,e.rotate,e.w,e.h)
+		end
 	end
 end
+
+function pre_spr(id,x,y,colorkey,scale,flip,rotate,w,h,z)
+	local e={
+		id=id,x=x,y=y,
+		colorkey=colorkey or -1,
+		scale=scale or 1,
+		flip=flip or 0,
+		rotate=rotate or 0,
+		w=w or 1,
+		h=h or 1,
+		z=y+(z or 0)
+	}
+	insert(drawing_tree,e)
+end
+
+-- 
 
 function calc_iso(x,y)
-	local xx=4.5*x
-	local xy=2*x
-	local yx=-4.5*y
-	local yy=2*y 
+	local xx=9*x
+	local xy=4*x
+	local yx=-9*y
+	local yy=4*y 
 	return xx+yx,xy+yy
 end
 
-function map_iso(x,y,w,h,sx,sy,remap)
-	for ix=x,x+w,2 do
-		for iy=y,y+h,2 do
-			if fget(mget(ix,iy),0) then
+function map_iso(x,y,w,h,sx,sy)
+	for ix=x,x+w do
+		for iy=y,y+h do
+			if fget(iso_mget(ix,iy),0) then
 				local dx,dy=calc_iso(ix,iy)
-				spr(mget(ix,iy),dx+sx,dy+sy,0,1,0,0,2,2)
+				spr_iso(iso_mget(ix,iy),dx+sx,dy+sy,0,1,0,0,2,2)
 			end
 		end
 	end
 end
 
+function iso_mget(x,y)
+	return mget(x*2,y*2)
+end
+
+-- camera
+
+local camera={
+	x=0,y=0,w=220,h=136
+}
+
+function update_camera(c,p)
+	local px,py=calc_iso(p.x,p.y)	
+	
+	c.x=px-c.w/2
+	c.y=py-c.h/2
+end
+
+function spr_iso(index,x,y,colorkey,scale,flip,rotate,w,h,z)
+	pre_spr(index,x-camera.x,y-camera.y,colorkey,scale,flip,rotate,w,h,z)
+end
+
+-- player
+
+local player={
+	x=1,y=1,
+	sprite=257
+}
+
+function draw_player(p)
+	local ix,iy=calc_iso(p.x,p.y)
+	spr_iso(p.sprite,
+		ix,iy,
+		0,1,0,0,2,2,1)
+end
+
+function update_player(p)
+	if btnp(0) then
+		p.y=p.y-1
+	elseif btnp(1) then
+		p.y=p.y+1
+	end
+	
+	if btnp(2) then
+		p.x=p.x-1
+	elseif btnp(3) then
+		p.x=p.x+1
+	end
+end
+
+--- game logic
+
+-- turn handling
+local turn_id=1
+
+local turn_order={
+	"player",
+	"enemy"
+}
+
+function turn()
+	return turn_order[turn_id]
+end
+
+function next_turn()
+	turn_id=(turn_id+1)%#turn_order + 1
+end
+
+function player_turn()
+	if turn()~="player" then
+		return
+	end
+	local did_move=false
+	if move_player(player) then
+		did_move=true
+	end
+	
+	if did_move then
+		next_turn()
+	end
+end
+
+function enemy_turn()
+	if turn()~="enemy" then
+		return
+	end
+	next_turn()
+end
+
+-- movement
+
+function is_solid(x,y)
+	return fget(iso_mget(x,y),SOLID_FLAG)
+end
+
+function move_player(p)
+	local did_move=false
+
+	if btnp(0) and not is_solid(p.x,p.y-1) then
+		p.y=p.y-1
+		did_move=true
+	elseif btnp(1) and not is_solid(p.x,p.y+1) then
+		p.y=p.y+1
+		did_move=true
+	end
+	if btnp(2) and not is_solid(p.x-1,p.y) then
+		p.x=p.x-1	
+		did_move=true
+	elseif btnp(3) and not is_solid(p.x+1,p.y) then
+		p.x=p.x+1
+		did_move=true
+	end
+
+	return did_move
+end
+
+-- main
+
 function TIC()
 	cls()
-	map_iso(0,0,32,32,72,32)
+	start_draw()
+	enemy_turn()
+	player_turn()
+	update_camera(camera,player)
+	local dx,dy=player.x,player.y
+	if dx-16<0 then dx=0 else dx=dx-16 end
+	if dy-16<0 then dy=0 else dy=dy-16 end
+	map_iso(dx,dy,32,32,0,0)
+	draw_player(player)
+	final_draw()
+	
 end
 
 -- <TILES>
@@ -184,6 +239,13 @@ end
 -- 161:eddffeefeeeeeffeeeeeeddfeeeeeeefeeefeff0efeff000eff00000f0000000
 -- 162:efeff000eff00000f00000000000000000000000000000000000000000000000
 -- </TILES>
+
+-- <SPRITES>
+-- 001:000000020000022200022222022222222222222222fff2f222f222f222f222ff
+-- 002:2000000022200000222220002222222022222222f2fff222f2f2f222f2ff2222
+-- 017:22f222f222f222f222fff2f22222222202222222000222220000022200000002
+-- 018:f2f2f222f2f2f222f2f2f2222222222222222220222220002220000020000000
+-- </SPRITES>
 
 -- <MAP>
 -- 000:304030403040304030403040304030400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -228,7 +290,7 @@ end
 -- </TRACKS>
 
 -- <FLAGS>
--- 000:00100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 000:00100030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 -- </FLAGS>
 
 -- <PALETTE>
