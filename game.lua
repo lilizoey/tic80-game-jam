@@ -12,25 +12,51 @@ local FLOOR_BLOCK = 3
 local HALF_BLOCK = 4
 local FULL_BLOCK = 5
 
+local PALETTE_ADDR=0x03FC0
+
 -- sample_map
 
 local sample_map={
-	{3,3,3,3,3,3,3,3},
-	{3,1,1,1,1,1,1,3},
-	{3,1,1,1,1,1,1,3},
-	{3,1,1,1,1,3,1,3},
-	{3,1,1,1,1,3,1,3},
-	{3,1,5,5,5,1,1,3},
-	{3,1,1,5,1,1,1,3},
-	{3,1,1,1,5,1,1,3},
-	{3,1,1,1,1,5,1,3},
-	{3,1,1,1,1,3,1,3},
-	{3,3,3,3,1,3,3,3},
-	{3,1,1,3,1,3,1,3},
-	{3,1,1,3,1,1,1,3},
-	{3,1,1,1,1,1,1,3},
-	{3,3,3,3,3,3,3,3},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
+	{1,1,1,1,1,1,1,1,1,1},
 }
+
+-- palette swapping
+
+local default_palette={}
+for i=0,15 do
+	local addr=PALETTE_ADDR
+	local palette={
+		r=peek(addr+i*3),
+		g=peek(addr+1+i*3),
+		b=peek(addr+2+i*3),
+	}
+	default_palette[i]=palette
+end
+
+local palettes={
+	{r=0xFF,g=0xFF,b=0xFF}
+}
+
+function swap_palette(p)
+	for k,v in pairs(p) do
+		trace(PALETTE_ADDR+k*3)
+		poke(PALETTE_ADDR+k*3,v.r)
+		poke(PALETTE_ADDR+k*3+1,v.g)
+		poke(PALETTE_ADDR+k*3+2,v.b)
+	end
+end
 
 -- custom drawing
 
@@ -76,6 +102,7 @@ end
 function final_draw()
 	for k,e in pairs(tree_list(drawing_tree)) do
 		if e.id then
+			trace(e.y)
 			spr(e.id,e.x,e.y,e.colorkey,e.scale,e.flip,e.rotate,e.w,e.h)
 		end
 	end
@@ -99,9 +126,9 @@ end
 
 function calc_iso(x,y)
 	local xx=8*x
-	local xy=4.5*x
+	local xy=5*x
 	local yx=-8*y
-	local yy=4.5*y 
+	local yy=5*y 
 	return xx+yx,xy+yy
 end
 
@@ -397,7 +424,7 @@ function TIC()
 		music(0,0,0,true,true)
 		playing_music=true
 	end
-	clear_visible()
+		clear_visible()
 	start_draw()
 	enemy_turn()
 	player_turn()
