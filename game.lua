@@ -18,23 +18,94 @@ local PALETTE_ADDR=0x03FC0
 -- sample_map
 
 local sample_map={
-	{03,03,03,03,03,03,03,03},
-	{03,32,32,32,01,01,01,03,32,32,32,32,32,32},
-	{03,32,32,32,01,01,01,01,32,32,32,32,32,32},
-	{03,32,32,32,01,03,01,05,32,32,32,32,32,32},
-	{03,01,01,32,01,03,01,05,32,32,32,225,225,32},
-	{03,01,32,51,32,01,01,05,32,32,32,32,32,32},
-	{03,01,01,32,01,01,01,05,32,32,32,32,32,32},
-	{03,01,01,01,05,01,01,05,32,32,32,32,32,32},
-	{03,01,01,01,01,05,01,05},
-	{03,01,01,01,01,03,01,03},
-	{03,03,03,03,01,03,03,03},
-	{03,01,01,03,01,03,01,03},
-	{03,01,01,03,01,01,01,03},
-	{03,01,01,01,01,01,01,03},
-	{03,03,03,03,03,03,03,03},
 }
 
+-- map generation
+
+local room_palettes={
+	default={full_wall=3,half_wall=5,floor=1,door=7,decor={51}}
+}
+
+function set_tile(map,x,y,val)
+	if not map[x] then map[x]={} end
+	map[x][y]=val
+end
+
+function square_room(map,palette,x0,y0,x1,y1,doors)
+	for x=x0,x1 do
+		for y=y0,y1 do
+			if x==x0 or y==y0 then
+				set_tile(map,x,y,palette.full_wall)
+			elseif x==x1 or y==y1 then
+				set_tile(map,x,y,palette.half_wall)
+			else
+				set_tile(map,x,y,palette.floor)
+			end
+		end
+	end
+
+	for i=1,math.random(1,((x1-x0)*(y1-y0))//10+1) do
+		local x=math.random(x0+1,x1-1)
+		local y=math.random(y0+1,y1-1)
+		local decor=palette.decor[math.random(1,#palette.decor)]
+		set_tile(map,x,y,decor)
+	end
+
+	for k,v in pairs(doors) do
+		set_tile(map,v[1],v[2],palette.door)
+		if v[1]==x0 then
+			for x=x0+1,(x1-x0)//2 do
+				set_tile(map,x,v[2],palette.floor)
+			end
+		elseif v[1]==x1 then
+			for x=x1-1,(x1-x0)//2,-1 do
+				set_tile(map,x,v[2],palette.floor)
+			end
+		elseif v[2]==y0 then
+			for y=y0+1,(y1-y0)//2 do
+				set_tile(map,v[1],y,palette.floor)
+			end
+		elseif v[2]==y1 then
+			for y=y1-1,(y1-y0)//2,-1 do
+				set_tile(map,v[1],y,palette.floor)
+			end
+		end
+	end
+
+	return map
+end
+
+function straight_corridor(map,palette,x0,y0,dir,dist)
+	if dir=="u" then
+		for y=y0,y0-dist,-1 do
+			set_tile(map,x0-1,y,palette.full_wall)
+			set_tile(map,x0,y,palette.floor)
+			set_tile(map,x0+1,y,palette.full_wall)
+		end
+	elseif dir=="r" then
+		for x=x0,x0+dist do
+			set_tile(map,x,y0-1,palette.full_wall)
+			set_tile(map,x,y0,palette.floor)
+			set_tile(map,x,y0+1,palette.half_wall)
+		end
+	elseif dir=="d" then
+		for y=y0,y0+dist do
+			set_tile(map,x0-1,y,palette.full_wall)
+			set_tile(map,x0,y,palette.floor)
+			set_tile(map,x0+1,y,palette.full_wall)
+		end
+	elseif dir=="l" then
+		for x=x0,x0-dist,-1 do
+			set_tile(map,x,y0-1,palette.full_wall)
+			set_tile(map,x,y0,palette.floor)
+			set_tile(map,x,y0+1,palette.half_wall)
+		end
+	end
+end
+
+square_room(sample_map,room_palettes.default,1,1,10,8,{{10,5}})
+straight_corridor(sample_map,room_palettes.default,10,5,"r",8)
+square_room(sample_map,room_palettes.default,18,1,24,11,{{18,5}})
 -- palette swapping
 
 local default_palette={}
@@ -757,7 +828,7 @@ end
 -- </TRACKS>
 
 -- <FLAGS>
--- 000:009080726231000000000000000000000080806262000000000000000000000090000062623100000000000000000000000000720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b400b000000000000000000000000000000000000000000000000000000000
+-- 000:609080726231000000000000000000000080806262000000000000000000000090000062623100000000000000000000000000720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b400b000000000000000000000000000000000000000000000000000000000
 -- </FLAGS>
 
 -- <PALETTE>
