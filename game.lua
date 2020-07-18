@@ -11,6 +11,7 @@ local OPAQUE_FLAG = 2
 local FLOOR_BLOCK = 3
 local HALF_BLOCK = 4
 local FULL_BLOCK = 5
+local ANIMATED_FLAG = 6
 
 local PALETTE_ADDR=0x03FC0
 
@@ -21,7 +22,7 @@ local sample_map={
 	{03,32,32,32,01,01,01,03,32,32,32,32,32,32},
 	{03,32,32,32,01,01,01,01,32,32,32,32,32,32},
 	{03,32,32,32,01,03,01,05,32,32,32,32,32,32},
-	{03,01,01,32,01,03,01,05,32,32,32,32,32,32},
+	{03,01,01,32,01,03,01,05,32,32,32,225,225,32},
 	{03,01,32,51,32,01,01,05,32,32,32,32,32,32},
 	{03,01,01,32,01,01,01,05,32,32,32,32,32,32},
 	{03,01,01,01,05,01,01,05,32,32,32,32,32,32},
@@ -132,25 +133,59 @@ function calc_iso(x,y)
 	return xx+yx,xy+yy
 end
 
+-- map drawing
+
+local animations={
+	[225]={frames={{t=45,s=225},{t=45,s=227}}}
+}
+
+local a_ticks=0
+
+function tick()
+	a_ticks=a_ticks+1
+end
+
+function animate(sprite)
+	if not animations[sprite] then return sprite end
+	if not animations[sprite].max then
+		local max = 0
+		for k,v in pairs(animations[sprite].frames) do
+			max=max+v.t
+		end
+		animations[sprite].max=max
+	end
+	local counter=a_ticks%animations[sprite].max
+	local index=1
+	while counter>animations[sprite].frames[index].t do
+		counter=counter-animations[sprite].frames[index].t
+		index=index+1
+	end
+	return animations[sprite].frames[index].s
+end
+
 function map_iso(x,y,w,h,sx,sy)
 	for ix=x,x+w do
 		for iy=y,y+h do
-			if fget(iso_mget(ix,iy),DRAW_FLAG) then
+			local sprite=iso_mget(ix,iy)
+			if fget(sprite,DRAW_FLAG) then
 				if is_visible(ix,iy) then
+					if fget(sprite, ANIMATED_FLAG) then
+						sprite=animate(sprite)
+					end
 					local dx,dy=calc_iso(ix,iy)
-					if fget(iso_mget(ix,iy),FLOOR_BLOCK) then
-						spr_iso(iso_mget(ix,iy),dx+sx,dy+sy,0,1,0,0,2,2)
-					elseif fget(iso_mget(ix,iy),HALF_BLOCK) then
-						spr_iso(iso_mget(ix,iy),dx+sx,dy+sy,0,1,0,0,2,2)
-					elseif fget(iso_mget(ix,iy),FULL_BLOCK) then
-						spr_iso(iso_mget(ix,iy),dx+sx,dy+sy,0,1,0,0,2,3)
+					if fget(sprite,FLOOR_BLOCK) then
+						spr_iso(sprite,dx+sx,dy+sy,0,1,0,0,2,2)
+					elseif fget(sprite,HALF_BLOCK) then
+						spr_iso(sprite,dx+sx,dy+sy,0,1,0,0,2,2)
+					elseif fget(sprite,FULL_BLOCK) then
+						spr_iso(sprite,dx+sx,dy+sy,0,1,0,0,2,3)
 					end
 					if is_visible(ix,iy) == "was visible" then
-						if fget(iso_mget(ix,iy),FLOOR_BLOCK) then
+						if fget(sprite,FLOOR_BLOCK) then
 							spr_iso(263,dx+sx,dy+sy,0,1,0,0,2,2)
-						elseif fget(iso_mget(ix,iy),HALF_BLOCK) then
+						elseif fget(sprite,HALF_BLOCK) then
 							spr_iso(261,dx+sx,dy+sy,0,1,0,0,2,2,1)
-						elseif fget(iso_mget(ix,iy),FULL_BLOCK) then
+						elseif fget(sprite,FULL_BLOCK) then
 							spr_iso(259,dx+sx,dy+sy,0,1,0,0,2,3,1) 
 						end
 					end
@@ -158,6 +193,7 @@ function map_iso(x,y,w,h,sx,sy)
 			end
 		end
 	end
+	tick()
 end
 
 function iso_mget(x,y)
@@ -209,7 +245,19 @@ function next_turn()
 	turn_id=(turn_id%#turn_order) + 1
 end
 
+function turn_is_inactive()
+	local match=true
+	function check(o)
+		if o.turn==turn() then match=false end
+	end
+	map_objects(check)
+	return match
+end
+
 function take_turns()
+	while turn_is_inactive() do
+		next_turn()
+	end
 	local turn_taken = false
 	function take_turn(o)
 		if o.turn==turn() then
@@ -709,7 +757,7 @@ end
 -- </TRACKS>
 
 -- <FLAGS>
--- 000:009080726231000000000000000000000080806262000000000000000000000090000062623100000000000000000000000000720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b000b000000000000000000000000000000000000000000000000000000000
+-- 000:009080726231000000000000000000000080806262000000000000000000000090000062623100000000000000000000000000720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b400b000000000000000000000000000000000000000000000000000000000
 -- </FLAGS>
 
 -- <PALETTE>
