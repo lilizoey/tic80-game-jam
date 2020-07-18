@@ -53,7 +53,6 @@ local palettes={
 
 function swap_palette(p)
 	for k,v in pairs(p) do
-		trace(PALETTE_ADDR+k*3)
 		poke(PALETTE_ADDR+k*3,v.r)
 		poke(PALETTE_ADDR+k*3+1,v.g)
 		poke(PALETTE_ADDR+k*3+2,v.b)
@@ -104,7 +103,6 @@ end
 function final_draw()
 	for k,e in pairs(tree_list(drawing_tree)) do
 		if e.id then
-			trace(e.y)
 			spr(e.id,e.x,e.y,e.colorkey,e.scale,e.flip,e.rotate,e.w,e.h)
 		end
 	end
@@ -194,13 +192,6 @@ function spr_iso(index,x,y,colorkey,scale,flip,rotate,w,h,z)
 end
 
 --- game logic
--- player
-
-local player={
-	x=2,y=2,
-	sprite=257,
-	facing=0
-}
 
 -- turn handling
 local turn_id=1
@@ -215,15 +206,26 @@ function turn()
 end
 
 function next_turn()
-	turn_id=(turn_id+1)%#turn_order + 1
+	turn_id=(turn_id%#turn_order) + 1
 end
 
-function player_turn()
+function take_turns()
+	local turn_taken = false
+	function take_turn(o)
+		if o.turn==turn() then
+			turn_taken=turn_taken or o:do_turn()
+		end
+	end
+	map_objects(take_turn)
+	if turn_taken then next_turn() end
+end
+
+function player_turn(p)
 	if turn()~="player" then
 		return
 	end
 	local did_move=false
-	if move_player(player) then
+	if p:do_turn() then
 		did_move=true
 	end
 	
@@ -236,38 +238,8 @@ function enemy_turn()
 	if turn()~="enemy" then
 		return
 	end
+	enemy_do_turns()
 	next_turn()
-end
-
--- movement
-
-function is_solid(x,y)
-	return fget(iso_mget(x,y),SOLID_FLAG)
-end
-
-function move_player(p)
-	local did_move=false
-
-	if btnp(0) and not is_solid(p.x,p.y-1) then
-		p.y=p.y-1
-		p.facing=0
-		did_move=true
-	elseif btnp(1) and not is_solid(p.x,p.y+1) then
-		p.y=p.y+1
-		p.facing=1
-		did_move=true
-	end
-	if btnp(2) and not is_solid(p.x-1,p.y) then
-		p.x=p.x-1	
-		p.facing=1
-		did_move=true
-	elseif btnp(3) and not is_solid(p.x+1,p.y) then
-		p.x=p.x+1
-		p.facing=0
-		did_move=true
-	end
-
-	return did_move
 end
 
 -- visibility
@@ -378,7 +350,7 @@ function can_see(x0,y0,x1,y1)
 	return true
 end
 
-function	shadow_casting(p,range)
+function shadow_casting(p,range)
 	for x=p.x-range,p.x+range do
 		for y=p.y-range,p.y+range do
 			if can_see(p.x,p.y,x,y) then
@@ -388,35 +360,180 @@ function	shadow_casting(p,range)
 	end
 end
 
--- enemy code
+--- objects
 
-local enemies={}
+Object = {
+	mt={},
+	prototype={
+		turn=nil
+	}
+}
 
-function draw_player(p)
-	local ix,iy=calc_iso(p.x,p.y)
-	spr_iso(p.sprite,
-		ix,iy,
-		0,1,p.facing,0,2,3,1)
+function Object.new(init)
+	setmetatable(init,Object.mt)
+	init:register()
+	return init
 end
 
+function Object.prototype:hit()
+end
+
+function Object.mt.__index(t,k)
+	return Object.prototype[k]
+end
+
+local object_map={}
+
+function Object.prototype:register()
+	if not object_map[self.x] then object_map[self.x] = {} end
+	object_map[self.x][self.y]=self
+end
+
+function Object.prototype:remove()
+	object_map[self.x][self.y] = nil
+end
+
+function Object.prototype:move(x,y)
+	if peek_obj(x,y) then return object_map[x][y] end
+	self:remove()
+	self.x=x
+	self.y=y
+	self:register()
+	return false
+end
+
+function peek_obj(x,y)
+	return object_map[x] and object_map[x][y]
+end
+
+function map_objects(f)
+	local objs = {}
+	for k,row in pairs(object_map) do
+		for k,o in pairs(row) do
+			table.insert(objs,o)
+		end
+	end
+	for k,o in pairs(objs) do
+		f(o)
+	end
+end
+
+function draw_objects()
+	function draw(o)
+		o:draw()
+	end
+	map_objects(draw)
+end
+
+function is_solid(x,y)
+	return fget(iso_mget(x,y),SOLID_FLAG)
+end
+
+-- player code
+
+local player=Object.new({
+	x=2,y=2,
+	sprite=257,
+	facing=0,
+	turn="player"
+})
+
+function player:do_turn()
+	local did_move=false
+	local obj = nil
+
+	if btnp(0) and not is_solid(self.x,self.y-1) then
+		obj=self:move(self.x,self.y-1)
+		self.facing=0
+		did_move=true
+	elseif btnp(1) and not is_solid(self.x,self.y+1) then
+		obj=self:move(self.x,self.y+1)
+		self.facing=1
+		did_move=true
+	elseif btnp(2) and not is_solid(self.x-1,self.y) then
+		obj=self:move(self.x-1,self.y)
+		self.facing=1
+		did_move=true
+	elseif btnp(3) and not is_solid(self.x+1,self.y) then
+		obj=self:move(self.x+1,self.y)
+		self.facing=0
+		did_move=true
+	end
+
+	if obj and obj.hit then
+		obj:hit()
+	end
+
+	if btnp(7) then
+		did_move=true
+	end
+
+	return did_move
+end
+
+function player:draw()
+	local ix,iy=calc_iso(self.x,self.y)
+	spr_iso(self.sprite,
+		ix,iy,
+		0,1,self.facing,0,2,3,1)
+end
+
+function player:hit()
+	self:die()
+end
+
+function player:die()
+	self:remove()
+end
+
+-- enemy code
+
 function create_enemy(x,y)
-	local enemy = {
-		x=x,y=y,sprite=305
+	local enemy = Object.new({
+		x=x,y=y,sprite=465,
+		enemy=true,
+		turn="enemy"
+	})
+
+	local dirs={
+		{0,1},{1,0},{0,-1},{-1,0}
 	}
 
 	function enemy:draw()
+		if is_visible(self.x,self.y)~="visible" then return end
 		local ix,iy=calc_iso(self.x,self.y)
-		spr_iso(self.sprite,
-			ix,iy,0,1,0,0,2,3,1)
+		spr_iso(self.sprite,ix,iy,0,1,0,0,2,3,1)
 	end
 
-	table.insert(enemies,enemy)
+	function enemy:do_turn()
+		local dir=dirs[math.random(1,#dirs)]
+		if not is_solid(self.x+dir[1],self.y+dir[2]) then
+			local obj=self:move(self.x+dir[1],self.y+dir[2])
+			if obj then obj:hit() end
+			return true
+		end
+		return false
+	end
+
+	function enemy:die()
+		self:remove()
+	end
+
+	function enemy:hit()
+		self:die()
+	end
+
 	return enemy
 end
 
-function draw_enemies()
-
+function enemy_do_turns()
+	function do_turn(o)
+		if o.enemy then o:do_turn() end
+	end
+	map_objects(do_turn)
 end
+
+create_enemy(5,5)
 
 -- main
 local playing_music=false
@@ -428,15 +545,14 @@ function TIC()
 	end
 		clear_visible()
 	start_draw()
-	enemy_turn()
-	player_turn()
+	take_turns()
 	shadow_casting(player,6)
 	update_camera(camera,player)
 	local dx,dy=player.x,player.y
 	if dx-16<0 then dx=0 else dx=dx-16 end
 	if dy-16<0 then dy=0 else dy=dy-16 end
 	map_iso(dx,dy,32,32,0,0)
-	draw_player(player)
+	draw_objects()
 	final_draw()
 	
 end
