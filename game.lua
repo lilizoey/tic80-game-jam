@@ -55,9 +55,6 @@ end
 
 -- sample_map
 
-local sample_map={
-}
-
 -- map generation
 
 local room_palettes={
@@ -219,7 +216,7 @@ function dungeon_generator(xmax,ymax)
 	return map
 end
 
-sample_map = dungeon_generator(60,60)
+local sample_map
 -- palette swapping
 
 local default_palette={}
@@ -381,12 +378,13 @@ function map_iso(x,y,w,h,sx,sy)
 	tick()
 end
 
-function iso_mget(x,y)
-	if not sample_map[x] or 
-	   not sample_map[x][y] then
+function iso_mget(x,y,map)
+	map=map or sample_map
+	if not map[x] or 
+	   not map[x][y] then
 		return 0
 	else
-		return sample_map[x][y]
+		return map[x][y]
 	end
 end
 
@@ -659,8 +657,8 @@ function draw_objects()
 	map_objects(draw)
 end
 
-function is_solid(x,y)
-	return fget(iso_mget(x,y),SOLID_FLAG)
+function is_solid(x,y,map)
+	return fget(iso_mget(x,y,map),SOLID_FLAG)
 end
 
 -- player code
@@ -670,7 +668,7 @@ local player=Object.new({
 	sprite=257,
 	facing=0,
 	turn="player",
-	hp=2,
+	hp=4,max_hp=4,alive=true
 })
 
 function player:do_turn()
@@ -728,6 +726,7 @@ end
 function player:die()
 	sfx_slide_whistle()
 	self:remove()
+	self.alive=false
 end
 
 function player:did_move()
@@ -740,7 +739,7 @@ function create_enemy(x,y,sprite,hp,atk)
 	local enemy = Object.new({
 		x=x,y=y,sprite=sprite,
 		enemy=true,hp=hp,atk=atk or 1,
-		turn="enemy"
+		turn="enemy",state="wander"
 	})
 
 	local dirs={
@@ -754,13 +753,33 @@ function create_enemy(x,y,sprite,hp,atk)
 	end
 
 	function enemy:do_turn()
-		local dir=dirs[math.random(1,#dirs)]
-		if not is_solid(self.x+dir[1],self.y+dir[2]) then
-			local obj=self:move(self.x+dir[1],self.y+dir[2])
-			if obj then obj:hit(self.atk) end
+		if player.alive and can_see(self.x,self.y,player.x,player.y) then self.state="charge" else self.state="wander" end
+		if self.state=="wander" then
+			return self:wander()
+		end
+		if self.state=="charge" then
+			return self:charge()
+		end
+	end
+
+	function enemy:try_move(x,y)
+		if not is_solid(x,y) then
+			local obj=self:move(x,y)
+			if obj and not obj.enemy then obj:hit(self.atk) end
 			return true
 		end
 		return false
+	end
+
+	function enemy:wander()
+		local dir=dirs[math.random(1,#dirs)]
+		return self:try_move(self.x+dir[1],self.y+dir[1])
+	end
+
+	function enemy:charge()
+		--local path = path({x=self.x,y=self.y},{x=player.x,y=player.y},sample_nodes,false)
+		local path = plot_line(self.x,self.y,player.x,player.y)
+		return self:try_move(path[2][1],path[2][2])
 	end
 
 	function enemy:die()
@@ -814,6 +833,32 @@ end
 function animate()
 
 end
+
+--- ui
+-- ui elements
+
+
+-- ui logic
+
+function show_resource_bar(s,x,y,hp,max_hp,colorkey)
+	for x=x,x+(max_hp//2)*9,9 do
+		if hp>1 then
+			spr(s,x,y,colorkey)
+			hp=hp-2
+		elseif hp==1 then
+			spr(s+1,x,y,colorkey)
+			hp=hp-1
+		else
+			spr(s+2,x,y,colorkey)
+		end
+	end
+end
+
+function OVR()
+	show_resource_bar(384,1,1,player.hp,player.max_hp,4)
+end
+
+sample_map = dungeon_generator(60,60)
 
 -- main
 local playing_music=false
@@ -991,6 +1036,9 @@ end
 -- 120:c000c0000c00c0000c0c000000c0000000c000000c0c0000c00c0000c000c000
 -- 121:000000000c00c000c000c000c000c0000cccc0000000c000c000c0000ccc0000
 -- 122:000000000000000000000000ccccc000000c000000c000000c000000ccccc000
+-- 128:4411114444122144111221111222222112222221111221114412214444111144
+-- 129:4411114444120144111201111222000112220001111201114412014444111144
+-- 130:4411114444100144111001111000000110000001111001114410014444111144
 -- 205:0000000000000000000000000000000000000000000000000000002000000032
 -- 206:0000000000220220022222220222222203222223003222302003230030003000
 -- 207:0000000000000000000000000000000000000000000000002020000032300000
