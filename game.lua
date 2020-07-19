@@ -49,16 +49,83 @@ function sfx_player_hit()
 	sfx(23,"G#4",21*4,3,15,4)
 end
 
-function sfx_stop()
-	sfx(-1)
+local s_t,s_end=-1,-1
+
+function sfx_stop_after(t)
+	s_t=0
+	s_end=t
 end
 
--- sample_map
+function sfx_stop()
+	sfx(-1,0,-1,3,15,0)
+	s_t=-1
+	s_end=-1
+end
+
+function sfx_tick()
+	if s_t<0 or s_end<0 then return end
+	s_t=s_t+1
+	if s_t>=s_end then
+		sfx_stop()
+	end
+end
+
+-- path tracing
+
+function path_inc(x0,y0,x1,y1)
+	if x1<x0 or y1<y0 then
+		return {}
+	end
+	local ix,iy=x0,y0
+	local points={{ix,iy}}
+	local mdx,mdy=math.abs(x1-x0),math.abs(y1-y0)
+
+	while ix~=x1 or iy~=y1 do
+		local dx,dy=math.abs(x1-ix)/mdx,math.abs(y1-iy)/mdy
+
+		if dy<dx and ix<x1 then
+			ix=ix+1
+		elseif dx<dy and iy<y1 then
+			iy=iy+1
+		elseif ix<x1 then
+			ix=ix+1
+		else
+			iy=iy+1
+		end
+
+		table.insert(points,{ix,iy})
+	end
+	return points
+end
+
+function path(x0,y0,x1,y1)
+	local points
+	if x0<=x1 and y0<=y1 then
+		points=path_inc(x0,y0,x1,y1)
+	elseif x0<=x1 and y1<=y0 then
+		points=path_inc(x0,y0,x1,y0+(y0-y1))
+		for k,v in pairs(points) do
+			v[2]=y0-(v[2]-y0)
+		end
+	elseif x1<=x0 and y0<=y1 then
+		points=path_inc(x0,y0,x0+(x0-x1),y1)
+		for k,v in pairs(points) do
+			v[1]=x0-(v[1]-x0)
+		end
+	elseif x1<=x0 and y1<=y0 then
+		points=path_inc(x0,y0,x0+(x0-x1),y0+(y0-y1))
+		for k,v in pairs(points) do
+			v[1]=x0-(v[1]-x0)
+			v[2]=y0-(v[2]-y0)
+		end
+	end
+	return points
+end
 
 -- map generation
 
 local room_palettes={
-	default={full_wall=3,half_wall=5,floor=1,door=7,decor={51},enemies={}}
+	default={full_wall=3,half_wall=5,floor=1,door=7,decor={51,32,37},enemies={}}
 }
 
 function set_tile(map,x,y,val)
@@ -443,12 +510,14 @@ function take_turns()
 	end
 	local turn_taken = false
 	function take_turn(o)
-		if o.turn==turn() then
+		if o.turn=="player" then
 			turn_taken=turn_taken or o:do_turn()
 		end
 	end
 	map_objects(take_turn)
-	if turn_taken then next_turn() end
+	if turn_taken then 
+		enemy_do_turns()
+	end
 end
 
 function player_turn(p)
@@ -675,19 +744,19 @@ function player:do_turn()
 	local did_move=false
 	local obj = nil
 
-	if btnp(0) and not is_solid(self.x,self.y-1) then
+	if btnp(0,20,5) and not is_solid(self.x,self.y-1) then
 		obj=self:move(self.x,self.y-1)
 		self.facing=0
 		did_move=true
-	elseif btnp(1) and not is_solid(self.x,self.y+1) then
+	elseif btnp(1,20,5) and not is_solid(self.x,self.y+1) then
 		obj=self:move(self.x,self.y+1)
 		self.facing=1
 		did_move=true
-	elseif btnp(2) and not is_solid(self.x-1,self.y) then
+	elseif btnp(2,20,5) and not is_solid(self.x-1,self.y) then
 		obj=self:move(self.x-1,self.y)
 		self.facing=1
 		did_move=true
-	elseif btnp(3) and not is_solid(self.x+1,self.y) then
+	elseif btnp(3,20,5) and not is_solid(self.x+1,self.y) then
 		obj=self:move(self.x+1,self.y)
 		self.facing=0
 		did_move=true
@@ -715,9 +784,9 @@ function player:attack(obj)
 	obj:hit()
 end
 
-function player:hit()
+function player:hit(dmg)
 	sfx_player_hit()
-	self.hp=self.hp-1
+	self.hp=self.hp-dmg
 	if self.hp<1 then
 		self:die()
 	end
@@ -773,13 +842,15 @@ function create_enemy(x,y,sprite,hp,atk)
 
 	function enemy:wander()
 		local dir=dirs[math.random(1,#dirs)]
-		return self:try_move(self.x+dir[1],self.y+dir[1])
+		self:try_move(self.x+dir[1],self.y+dir[1])
+		return true
 	end
 
 	function enemy:charge()
-		--local path = path({x=self.x,y=self.y},{x=player.x,y=player.y},sample_nodes,false)
-		local path = plot_line(self.x,self.y,player.x,player.y)
-		return self:try_move(path[2][1],path[2][2])
+		local path = path(self.x,self.y,player.x,player.y)
+		local move=self:try_move(path[2][1],path[2][2])
+		if not move then self:wander() end
+		return true
 	end
 
 	function enemy:die()
@@ -840,22 +911,142 @@ end
 
 -- ui logic
 
-function show_resource_bar(s,x,y,hp,max_hp,colorkey)
-	for x=x,x+(max_hp//2)*9,9 do
-		if hp>1 then
-			spr(s,x,y,colorkey)
-			hp=hp-2
-		elseif hp==1 then
-			spr(s+1,x,y,colorkey)
-			hp=hp-1
+function show_resource_bar(s,x,y,res,max_res,colorkey,scale)
+	scale=scale or 1
+	for x=x,x+(max_res//2 - 1)*(9*scale),(9*scale) do
+		if res>1 then
+			spr(s,x,y,colorkey,scale)
+			res=res-2
+		elseif res==1 then
+			spr(s+1,x,y,colorkey,scale)
+			res=res-1
 		else
-			spr(s+2,x,y,colorkey)
+			spr(s+2,x,y,colorkey,scale)
 		end
 	end
 end
 
+
+function wrap(str, limit, indent, indent1)
+	indent = indent or ""
+	indent1 = indent1 or indent
+	limit = limit or 72
+	local here = 1-#indent1
+	local function check(sp, st, word, fi)
+	   if fi - here > limit then
+		  here = st - #indent
+		  return "\n"..indent..word
+	   end
+	end
+	return indent1..str:gsub("(%s+)()(%S+)()", check)
+end
+
+local SIDE_LEFT=0
+local SIDE_RIGHT=1
+
+local Dialogue={
+	mt={},
+	pt={margin=5,text_margin=2,rows=3,sprite=3}
+}
+
+function Dialogue.mt.__index(t,k)
+	return Dialogue.pt[k]
+end
+
+function Dialogue.new(head,side,text,sound)
+	local dialogue=setmetatable({head=head,side=side,index=1,sound=sound},Dialogue.mt)
+	dialogue:chunk_text(text)
+	return dialogue
+end
+
+function Dialogue.pt:text_height()
+	return self.rows*9+self.text_margin*2-1
+end
+
+function Dialogue.pt:text_space()
+	local x,y,w,h=self:dimensions()
+	local sx,sy,sw,sh=self:sprite_dimensions()
+	return w-sw
+end
+
+function Dialogue.pt:text_start(row)
+	local x,y,w,h=self:dimensions()
+	local sx,sy,sw,sh=self:sprite_dimensions()
+	if self.side==SIDE_LEFT then
+		return sx+sw,y+self.text_margin+9*(row-1)
+	elseif self.side==SIDE_RIGHT then
+		return x+self.text_margin,y+self.text_margin+9*(row-1)
+	else
+		return 0,0
+	end
+end
+
+function Dialogue.pt:dimensions()
+	return self.margin,136-self.margin-self:text_height(),220-self.margin*2,self:text_height()
+end
+
+function Dialogue.pt:sprite_dimensions()
+	local x,y,w,h=self:dimensions()
+	if self.side==SIDE_LEFT then
+		x=x
+	elseif self.side==SIDE_RIGHT then
+		x=x+w-(self.sprite*8+self.text_margin*2)
+	end
+	return x,y,self.sprite*8+self.text_margin*2,self.sprite*8+self.text_margin*2
+end
+
+function Dialogue.pt:chunk_text(text)
+	local word_map={}
+	for word in string.gmatch(text,"%g+") do
+		table.insert(word_map,{word,font(word,0,-8,0)})
+	end
+	local lines,line,line_len={},"",0
+	for k,v in pairs(word_map) do
+		if line_len==0 or (line_len+v[2]<self:text_space()) then
+			line=line..v[1].." "
+			line_len=line_len+v[2]+8
+		else
+			table.insert(lines,{line,line_len})
+			line,line_len=v[1].." ",v[2]+8
+		end
+	end
+	self.lines=lines
+end
+
+function Dialogue.pt:draw()
+	local x,y,w,h=self:dimensions()
+	local sx,sy,sw,sh=self:sprite_dimensions()
+	rect(x,y,w,h,0)
+	rectb(x,y,w,h,12)
+	spr(self.head,sx+self.text_margin,sy+self.text_margin,0,self.sprite,self.side)
+	for i=1,self.rows do
+		local row = (self.index-1)*self.rows+i
+		if not self.lines[row] then break end
+		local line = self.lines[row]
+		local tx,ty=self:text_start((row-1)%self.rows+1)
+		font(line[1],tx+(7+self:text_space()-line[2])*self.side,ty,0)
+	end
+end
+
+function Dialogue.pt:next()
+	self.index=self.index+1
+	if not self.lines[(self.index-1)*self.rows+1] then
+		self:finish()
+		return
+	end
+	self.sound()
+	sfx_stop_after(60)
+end
+
+local current_dialogue=Dialogue.new(400,SIDE_RIGHT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills. I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target.",sfx_demon_girl_voice)
+
+function Dialogue.pt:finish()
+	current_dialogue = nil
+end
+
 function OVR()
-	show_resource_bar(384,1,1,player.hp,player.max_hp,4)
+	show_resource_bar(384,1,1,player.hp,player.max_hp,4,2)
+	if current_dialogue then current_dialogue:draw() end
 end
 
 sample_map = dungeon_generator(60,60)
@@ -864,9 +1055,6 @@ sample_map = dungeon_generator(60,60)
 local playing_music=false
 function TIC()
 	cls()
---	for i=0,2 do
---		poke4(0x0FF9C*2+(36)*i+3,0xF)
---	end
 	if not playing_music then
 		music(0,0,0,true,true)
 		playing_music=true
@@ -882,7 +1070,10 @@ function TIC()
 	map_iso(dx,dy,16,16,0,0)
 	draw_objects()
 	final_draw()
-	
+	sfx_tick()
+	if btnp(4) and current_dialogue then
+		current_dialogue:next()
+	end
 end
 
 -- <TILES>
@@ -1039,6 +1230,7 @@ end
 -- 128:4411114444122144111221111222222112222221111221114412214444111144
 -- 129:4411114444120144111201111222000112220001111201114412014444111144
 -- 130:4411114444100144111001111000000110000001111001114410014444111144
+-- 144:000000000001110c00c1111c01c1122001122240011242300132320001335150
 -- 205:0000000000000000000000000000000000000000000000000000002000000032
 -- 206:0000000000220220022222220222222203222223003222302003230030003000
 -- 207:0000000000000000000000000000000000000000000000002020000032300000
