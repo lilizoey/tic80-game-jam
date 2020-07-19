@@ -103,9 +103,85 @@ function straight_corridor(map,palette,x0,y0,dir,dist)
 	end
 end
 
-square_room(sample_map,room_palettes.default,1,1,10,8,{{10,5}})
-straight_corridor(sample_map,room_palettes.default,10,5,"r",8)
-square_room(sample_map,room_palettes.default,18,1,24,11,{{18,5}})
+function split(x0,y0,x1,y1)
+	if x1-x0<5 or y1-y0<5 then return {{x0,y0,x1,y1}} end
+	local dir
+	if x1-x0>(y1-y0) then
+		dir=1
+	elseif y1-y0>(x1-x0) then
+		dir=2
+	end
+	dir=dir or math.random(1,2)
+	local rooms={}
+	if dir==1 then
+		local split_line=math.random(x0+5,x1-5)
+		rooms[1]={x0,y0,split_line,y1}
+		rooms[2]={split_line,y0,x1,y1}
+	else
+		local split_line=math.random(y0+5,y1-5)
+		rooms[1]={x0,y0,x1,split_line}
+		rooms[2]={x0,split_line,x1,y1}
+	end
+	return {rooms[1],rooms[2]}
+end
+
+function largest_room(rooms)
+	local largest=1
+	for k,room in  pairs(rooms) do
+		if (room[3]-room[1])*(room[4]-room[2])>(rooms[largest][3]-rooms[largest][1])*(rooms[largest][4]-rooms[largest][2]) then largest=k end
+	end
+	return largest
+end
+
+function dungeon_generator(xmax,ymax)
+	local rooms={{0,0,xmax,ymax}}
+	local corridors={}
+	local fails=0
+	for i=1,20 do
+		if fails==3 then break end
+		local room_id=largest_room(rooms)
+		local room=rooms[room_id]
+		local splitted={room}
+		local i=1
+		while #splitted<2 and i< 20 do
+			splitted=split(room[1],room[2],room[3],room[4])
+			i=i+1
+		end
+		if i==20 then fails=fails+1 end
+		for k,v in pairs(splitted) do
+			table.insert(rooms,v)
+		end
+		table.remove(rooms,room_id)
+	end
+	local map={}
+	for k,room in pairs(rooms) do
+		local doors={}
+		if room[1]~=0 then
+			local door={room[1]+1,math.random(room[2]+2,room[4]-2)}
+			table.insert(doors,door)
+			table.insert(corridors,{door[1],door[2],"l",2})
+		elseif room[2]~=0 then
+			local door={math.random(room[1]+2,room[3]-2),room[2]+1}
+			table.insert(doors,door)
+			table.insert(corridors,{door[1],door[2],"u",2})
+		elseif room[3]~=xmax then
+			local door={room[3]-1,math.random(room[2]+2,room[4]-2)}
+			table.insert(doors,door)
+			table.insert(corridors,{door[1],door[2],"r",2})
+		elseif room[4]~=ymax then
+			local door={math.random(room[4]+2,room[3]-2),room[4]-1}
+			table.insert(doors,door)
+			table.insert(corridors,{door[1],door[2],"d",2})
+		end
+		square_room(map,room_palettes.default,room[1]+1,room[2]+1,room[3]-1,room[4]-1,doors)
+	end
+	for k,corridor in pairs(corridors) do
+		straight_corridor(map,room_palettes.default,corridor[1],corridor[2],corridor[3],corridor[4])
+	end
+	return map
+end
+
+sample_map = dungeon_generator(60,60)
 -- palette swapping
 
 local default_palette={}
@@ -668,9 +744,9 @@ function TIC()
 	shadow_casting(player,6)
 	update_camera(camera,player)
 	local dx,dy=player.x,player.y
-	if dx-16<0 then dx=0 else dx=dx-16 end
-	if dy-16<0 then dy=0 else dy=dy-16 end
-	map_iso(dx,dy,32,32,0,0)
+	if dx-8<0 then dx=0 else dx=dx-8 end
+	if dy-8<0 then dy=0 else dy=dy-8 end
+	map_iso(dx,dy,16,16,0,0)
 	draw_objects()
 	final_draw()
 	
