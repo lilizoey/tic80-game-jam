@@ -1083,36 +1083,90 @@ current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"What the fuck did 
 current_conversation:add_dialogue(Dialogue.new(401,SIDE_RIGHT,"I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. ",sfx_slime_girl_voice))
 current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words. ",sfx_demon_girl_voice))
 
-function OVR()
-	show_resource_bar(384,1,1,player.hp,player.max_hp,4,2)
-	if current_conversation then current_conversation:draw() end
+-- main
+
+local playing_music=false
+sample_map = dungeon_generator(60,60)
+local state = "game"
+local state_stack = {}
+local states
+
+function swap_state(new_state)
+	table.insert(state_stack,state)
+	state=new_state
 end
 
-sample_map = dungeon_generator(60,60)
+function pop_state()
+	state=table.remove(state_stack)
+end
 
--- main
-local playing_music=false
+function peek_state()
+	return state_stack[#state_stack]
+end
+
+states={
+	game={
+		update=function() 
+			clear_visible()
+			take_turns()
+			shadow_casting(player,6)
+			if btnp(4) then start_conversation(current_conversation) end
+		end,
+		draw=function()
+			cls()
+			update_camera(camera,player)
+			local dx,dy=player.x,player.y
+			if dx-8<0 then dx=0 else dx=dx-8 end
+			if dy-8<0 then dy=0 else dy=dy-8 end
+			map_iso(dx,dy,16,16,0,0)
+			draw_objects()
+		end,
+		hud=function()
+			show_resource_bar(384,1,1,player.hp,player.max_hp,4,2)
+		end,
+		music=function()
+			if not playing_music then
+				music(0,0,0,true,true)
+				playing_music=true
+			end
+		end,
+	},
+	conversation={
+		update=function()
+			if btnp(4) then
+				states[state].conversation:next()
+			end
+			if states[state].conversation:is_complete() then
+				pop_state()
+			end
+		end,
+		draw=function()
+		end,
+		hud=function()
+			states[peek_state()].hud()
+			states[state].conversation:draw()
+		end,
+		music=function() end,
+		conversation=nil
+	}
+}
+
+function start_conversation(conversation)
+	swap_state("conversation")
+	states[state].conversation=conversation
+end
+
+function OVR()
+	states[state].hud()
+end
+
 function TIC()
-	cls()
-	if not playing_music then
-		music(0,0,0,true,true)
-		playing_music=true
-	end
-		clear_visible()
+	states[state].update()
+	states[state].music()
 	start_draw()
-	take_turns()
-	shadow_casting(player,6)
-	update_camera(camera,player)
-	local dx,dy=player.x,player.y
-	if dx-8<0 then dx=0 else dx=dx-8 end
-	if dy-8<0 then dy=0 else dy=dy-8 end
-	map_iso(dx,dy,16,16,0,0)
-	draw_objects()
+	states[state].draw()
 	final_draw()
 	sfx_tick()
-	if btnp(4) and current_conversation then
-		current_conversation:next()
-	end
 end
 
 -- <TILES>
