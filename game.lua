@@ -1031,22 +1031,61 @@ end
 function Dialogue.pt:next()
 	self.index=self.index+1
 	if not self.lines[(self.index-1)*self.rows+1] then
-		self:finish()
-		return
+		return true
 	end
 	self.sound()
 	sfx_stop_after(60)
+	return false
 end
 
-local current_dialogue=Dialogue.new(400,SIDE_RIGHT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills. I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target.",sfx_demon_girl_voice)
-
-function Dialogue.pt:finish()
-	current_dialogue = nil
+function Dialogue.pt:is_complete()
+	return not self.lines[(self.index-1)*self.rows+1]
 end
+
+local Conversation={
+	mt={},
+	pt={}
+}
+
+function Conversation.mt.__index(t,k) return Conversation.pt[k] end
+
+function Conversation.new()
+	return setmetatable({dialogues={},current_dialogue=1},Conversation.mt)
+end
+
+function Conversation.pt:is_complete()
+	return self.current_dialogue > #self.dialogues
+end
+
+function Conversation.pt:add_dialogue(dialogue)
+	table.insert(self.dialogues,dialogue)
+end
+
+function Conversation.pt:get_dialogue()
+	return self.dialogues[self.current_dialogue]
+end
+
+function Conversation.pt:draw()
+	if not self:is_complete() then
+		self:get_dialogue():draw()
+	end
+end
+
+function Conversation.pt:next()
+	if self:get_dialogue():next() then
+		self.current_dialogue=self.current_dialogue+1
+		if self:get_dialogue() then self:get_dialogue().sound() end
+	end
+end
+
+local current_conversation=Conversation.new()
+current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills.",sfx_demon_girl_voice))
+current_conversation:add_dialogue(Dialogue.new(401,SIDE_RIGHT,"I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. ",sfx_slime_girl_voice))
+current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words. ",sfx_demon_girl_voice))
 
 function OVR()
 	show_resource_bar(384,1,1,player.hp,player.max_hp,4,2)
-	if current_dialogue then current_dialogue:draw() end
+	if current_conversation then current_conversation:draw() end
 end
 
 sample_map = dungeon_generator(60,60)
@@ -1071,8 +1110,8 @@ function TIC()
 	draw_objects()
 	final_draw()
 	sfx_tick()
-	if btnp(4) and current_dialogue then
-		current_dialogue:next()
+	if btnp(4) and current_conversation then
+		current_conversation:next()
 	end
 end
 
@@ -1231,6 +1270,7 @@ end
 -- 129:4411114444120144111201111222000112220001111201114412014444111144
 -- 130:4411114444100144111001111000000110000001111001114410014444111144
 -- 144:000000000001110c00c1111c01c1122001122240011242300132320001335150
+-- 145:000000000000000000aaa0000aaaaa00aaaa8800aa888400aa848900aa898000
 -- 205:0000000000000000000000000000000000000000000000000000002000000032
 -- 206:0000000000220220022222220222222203222223003222302003230030003000
 -- 207:0000000000000000000000000000000000000000000000002020000032300000
