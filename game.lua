@@ -124,10 +124,37 @@ end
 
 -- map generation
 
-local room_palettes={
-	default={full_wall=3,half_wall=5,floor=1,door=7,decor={32,64,50},enemies={}},
-	mossy_room={full_wall=3,half_wall=5,floor={98,100,102,104},door=7,decor={},enemies={}}
+local enemy_palettes={
+	default=nil
 }
+
+local room_palettes={
+	default={full_wall=3,half_wall=5,floor=1,door=7,decor={32,64,50},enemy_frequency=0.02,enemies=enemy_palettes.default},
+	mossy_room={full_wall=3,half_wall=5,floor={98,100,102,104},door=7,decor={},enemy_frequency=0,enemies={}}
+}
+
+local dungeon_palettes={
+	default={
+		{prob=10,e=room_palettes.default},
+		{prob=2,e=room_palettes.mossy_room}
+	}
+}
+
+function get_random_from_palette(palette)
+	local max = 0
+	for k,v in pairs(palette) do
+		max=max+v.prob
+	end
+
+	local rand=math.random(1,max)
+	local i=1
+	while rand>palette[i].prob do
+		rand=rand-palette[i].prob
+		i=i+1
+	end
+
+	return palette[i].e
+end
 
 function set_tile(map,x,y,val)
 	if not map[x] then map[x]={} end
@@ -153,16 +180,35 @@ function square_room(map,palette,x0,y0,x1,y1,doors)
 
 	for i=1,math.random(1,((x1-x0)*(y1-y0))//10+1) do
 		if #palette.decor==0 then break end
-		local x=math.random(x0+1,x1-1)
-		local y=math.random(y0+1,y1-1)
+		local x,y
 		local decor=palette.decor[math.random(1,#palette.decor)]
+		if fget(decor,SOLID_FLAG) then
+			x=math.random(x0+2,x1-2)
+			y=math.random(y0+2,y1-2)
+		else
+			x=math.random(x0+1,x1-1)
+			y=math.random(y0+1,y1-1)
+		end
 		set_tile(map,x,y,decor)
 	end
 
 	for k,v in pairs(doors) do
-		set_tile(map,x0+v[1],y0+v[2],palette.door)
+		set_tile(map,x0+v[1],y0+v[2],palette.floor)
+		create_door(x0+v[1],y0+v[2],x0+v[1]==x0 or x0+v[1]==x1)
 	end
 
+	if palette.enemy_frequency>0 then
+		for i=1,math.random(math.ceil((x1-x0)*(y1-y0)*palette.enemy_frequency))*2 do
+			local x=math.random(x0+2,x1-2)
+			local y=math.random(y0+2,y1-2)
+			while fget(iso_mget(x,y,map),SOLID_FLAG) do
+				x=math.random(x0+2,x1-2)
+				y=math.random(y0+2,y1-2)
+			end
+			local enemy = get_random_from_palette(palette.enemies)
+			enemy(x,y)
+		end
+	end
 	return map
 end
 
@@ -215,62 +261,6 @@ function split(x0,y0,x1,y1)
 	end
 	return {rooms[1],rooms[2]}
 end
-
-function largest_room(rooms)
-	local largest=1
-	for k,room in  pairs(rooms) do
-		if (room[3]-room[1])*(room[4]-room[2])>(rooms[largest][3]-rooms[largest][1])*(rooms[largest][4]-rooms[largest][2]) then largest=k end
-	end
-	return largest
-end
-
---[[function dungeon_generator(xmax,ymax)
-	local rooms={{0,0,xmax,ymax}}
-	local corridors={}
-	local fails=0
-	for i=1,20 do
-		if fails==3 then break end
-		local room_id=largest_room(rooms)
-		local room=rooms[room_id]
-		local splitted={room}
-		local i=1
-		while #splitted<2 and i< 20 do
-			splitted=split(room[1],room[2],room[3],room[4])
-			i=i+1
-		end
-		if i==20 then fails=fails+1 end
-		for k,v in pairs(splitted) do
-			table.insert(rooms,v)
-		end
-		table.remove(rooms,room_id)
-	end
-	local map={}
-	for k,room in pairs(rooms) do
-		local doors={}
-		if room[1]~=0 then
-			local door={room[1]+1,math.random(room[2]+2,room[4]-2)}
-			table.insert(doors,door)
-			table.insert(corridors,{door[1],door[2],"l",2})
-		elseif room[2]~=0 then
-			local door={math.random(room[1]+2,room[3]-2),room[2]+1}
-			table.insert(doors,door)
-			table.insert(corridors,{door[1],door[2],"u",2})
-		elseif room[3]~=xmax then
-			local door={room[3]-1,math.random(room[2]+2,room[4]-2)}
-			table.insert(doors,door)
-			table.insert(corridors,{door[1],door[2],"r",2})
-		elseif room[4]~=ymax then
-			local door={math.random(room[4]+2,room[3]-2),room[4]-1}
-			table.insert(doors,door)
-			table.insert(corridors,{door[1],door[2],"d",2})
-		end
-		square_room(map,room_palettes.mossy_room,room[1]+1,room[2]+1,room[3]-1,room[4]-1,doors)
-	end
-	for k,corridor in pairs(corridors) do
-		straight_corridor(map,room_palettes.default,corridor[1],corridor[2],corridor[3],corridor[4])
-	end
-	return map
-end]]--
 
 function init_dungeon(x,y,w,h)
 	return {{x=x,y=y,w=w,h=h,conn={}}}
@@ -368,18 +358,21 @@ function split_once(dungeon,minw,minh,spacing)
 	end
 end
 
-function dungeon_generator(xmax,ymax,spacing)
+function dungeon_generator(xmax,ymax,spacing,dungeon_palette)
 	local rooms=init_dungeon(0,0,xmax,ymax)
 	spacing=spacing or 3
-	for i=1,30 do
+	dungeon_palette=dungeon_palette or dungeon_palettes.default
+	for i=1,math.random((xmax*ymax)//20-5,(xmax*ymax)//20+5) do
 		split_once(rooms,4,4,spacing)
 	end
 
 	local map={}
 
 	for k,room in pairs(rooms) do
-		square_room(map,room_palettes.default,room.x,room.y,room.x+room.w,room.y+room.h,room.conn)
+		local palette=get_random_from_palette(dungeon_palette)
+		square_room(map,palette,room.x,room.y,room.x+room.w,room.y+room.h,room.conn)
 		for k,conn in pairs(room.conn) do
+			local palette=get_random_from_palette(dungeon_palette)
 			local dir
 			if conn[1]==0 then dir="l"
 			elseif conn[1]==room.w then dir="r"
@@ -394,31 +387,6 @@ function dungeon_generator(xmax,ymax,spacing)
 end
 
 local sample_map
--- palette swapping
-
-local default_palette={}
-for i=0,15 do
-	local addr=PALETTE_ADDR
-	local palette={
-		r=peek(addr+i*3),
-		g=peek(addr+1+i*3),
-		b=peek(addr+2+i*3),
-	}
-	default_palette[i]=palette
-end
-
-local palettes={
-	{r=0xFF,g=0xFF,b=0xFF}
-}
-
-function swap_palette(p)
-	for k,v in pairs(p) do
-		poke(PALETTE_ADDR+k*3,v.r)
-		poke(PALETTE_ADDR+k*3+1,v.g)
-		poke(PALETTE_ADDR+k*3+2,v.b)
-	end
-end
-
 -- custom drawing
 
 function init_node(e)
@@ -848,6 +816,7 @@ local player=Object.new({
 	facing=0,
 	turn="player",
 	hp=4,max_hp=4,alive=true,
+	money=0,
 	animation={
 		tick=0,max=80,
 		frames={{i=0,t=40},{i=1,t=10},{i=2,t=10},{i=0,t=10},{i=3,t=10}}
@@ -914,7 +883,8 @@ function player:draw()
 end
 
 function player:attack(obj)
-	obj:hit()
+	local res = obj:hit()
+	if res then self.money=self.money+res end
 end
 
 function player:hit(dmg)
@@ -937,11 +907,11 @@ end
 
 -- enemy code
 
-function create_enemy(x,y,sprite,hp,atk)
+function create_enemy(x,y,sprite,hp,atk,value)
 	local enemy = Object.new({
 		x=x,y=y,sprite=sprite,
 		enemy=true,hp=hp,atk=atk or 1,
-		turn="enemy",state="wander"
+		turn="enemy",state="wander",value=value
 	})
 
 	local dirs={
@@ -989,14 +959,16 @@ function create_enemy(x,y,sprite,hp,atk)
 	function enemy:die()
 		sfx_skeleton()
 		self:remove()
+		return self.value
 	end
 
 	function enemy:hit()
 		sfx_enemy_hit()
 		self.hp=self.hp-1
 		if self.hp<1 then
-			self:die()
+			return self:die()
 		end
+		return 0
 	end
 
 	return enemy
@@ -1010,32 +982,37 @@ function enemy_do_turns()
 end
 
 function rave_skeleton(x,y)
-	local enemy=create_enemy(x,y,464,1)
+	local enemy=create_enemy(x,y,464,1,1,5)
 end
 
 function link_the_skeleton(x,y)
-	local enemy=create_enemy(x,y,466,2)
+	local enemy=create_enemy(x,y,466,2,1,10)
 end
 
 function turtleneck_skeleton(x,y)
-	local enemy=create_enemy(x,y,468,1,2)
+	local enemy=create_enemy(x,y,468,1,2,10)
 end
 
-rave_skeleton(3,3)
-link_the_skeleton(4,4)
-turtleneck_skeleton(5,5)
--- animation buffer
+-- door
 
-local animation_buffer={}
+function create_door(x,y,flip)
+	local door = Object.new({
+		x=x,y=y,sprite=7,
+	})
 
-local sample_animation={frames={{t=45,s=1},{t=45,s=2}}}
+	if flip then door.flip=1 else door.flip=0 end
 
-function add_animation(animation)
-	table.insert(animation_buffer)
-end
+	function door:hit()
+		self:remove()
+	end
 
-function animate()
+	function door:draw()
+		if not is_visible(self.x,self.y) then return end
+		local ix,iy=calc_iso(self.x,self.y)
+		spr_iso(self.sprite,ix,iy,0,1,door.flip,0,2,3,1)
+	end
 
+	return door
 end
 
 --- ui
@@ -1054,6 +1031,11 @@ function show_resource_bar(s,x,y,res,max_res)
 			spr(s+2,x+(i//2)*18,y,0,1,0,0,2,1)
 		end
 	end
+end
+
+function show_money(s,x,y,amount)
+	spr(s,x,y,0)
+	font("x"..tostring(amount),x+9,y)
 end
 
 
@@ -1215,8 +1197,11 @@ current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"I will wipe you th
 
 -- main
 
+enemy_palettes.default={{prob=9,e=rave_skeleton},{prob=3,e=link_the_skeleton},{prob=3,e=turtleneck_skeleton}}
+room_palettes.default.enemies=enemy_palettes.default
+
 local playing_music=false
-sample_map = dungeon_generator(60,60)
+sample_map = dungeon_generator(40,40,6)
 local state = "game"
 local state_stack = {}
 local states
@@ -1253,6 +1238,7 @@ states={
 		end,
 		hud=function()
 			show_resource_bar(432,1,1,player.hp,player.max_hp)
+			show_money(384,1,18,player.money)
 		end,
 		music=function()
 			if not playing_music then
@@ -1646,9 +1632,10 @@ end
 -- </TRACKS>
 
 -- <FLAGS>
--- 000:00900072003100500000000000000000000000000000000000000000000000009000000000000000000000000000000000003000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000090009000900090009000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009400900094009000000000000000000000000000000000000000000000000000
+-- 000:00900072003100500000000000000000000000000000000000000000000000009000000000000000000000000000000000007200000000000000000000000000900000000000000000000000000000000000000000000000000000000000000090009000900090009000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009400900094009000000000000000000000000000000000000000000000000000
 -- </FLAGS>
 
 -- <PALETTE>
 -- 000:1a1c2c5d275db13e53952c40ffcd755040403828181820341c792c20482c0830043081daffffe294b0c2566c86343c57
 -- </PALETTE>
+
