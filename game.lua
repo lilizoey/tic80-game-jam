@@ -160,24 +160,7 @@ function square_room(map,palette,x0,y0,x1,y1,doors)
 	end
 
 	for k,v in pairs(doors) do
-		set_tile(map,v[1],v[2],palette.door)
-		if v[1]==x0 then
-			for x=x0+1,(x1-x0)//2 do
-				set_tile(map,x,v[2],palette.floor)
-			end
-		elseif v[1]==x1 then
-			for x=x1-1,(x1-x0)//2,-1 do
-				set_tile(map,x,v[2],palette.floor)
-			end
-		elseif v[2]==y0 then
-			for y=y0+1,(y1-y0)//2 do
-				set_tile(map,v[1],y,palette.floor)
-			end
-		elseif v[2]==y1 then
-			for y=y1-1,(y1-y0)//2,-1 do
-				set_tile(map,v[1],y,palette.floor)
-			end
-		end
+		set_tile(map,x0+v[1],y0+v[2],palette.door)
 	end
 
 	return map
@@ -241,7 +224,7 @@ function largest_room(rooms)
 	return largest
 end
 
-function dungeon_generator(xmax,ymax)
+--[[function dungeon_generator(xmax,ymax)
 	local rooms={{0,0,xmax,ymax}}
 	local corridors={}
 	local fails=0
@@ -286,6 +269,127 @@ function dungeon_generator(xmax,ymax)
 	for k,corridor in pairs(corridors) do
 		straight_corridor(map,room_palettes.default,corridor[1],corridor[2],corridor[3],corridor[4])
 	end
+	return map
+end]]--
+
+function init_dungeon(x,y,w,h)
+	return {{x=x,y=y,w=w,h=h,conn={}}}
+end
+
+function lines_overlap(x0,w0,x1,w1)
+	return (x0<=x1+w1 and x0>=x1) or (x1<=x0+w0 and x1>=x0)
+end
+
+function can_connect(room1,room2)
+	return lines_overlap(room1.x+1,room1.w-1,room2.x+1,room2.w-1) or lines_overlap(room1.y+1,room1.h-1,room2.y+1,room2.h-1)
+end
+
+function connect_rooms(room1,room2)
+	if room1.x>room2.x+room2.w then -- room1 right of room2
+		local miny,maxy
+		if room1.y<room2.y then miny=room2.y+1 else miny=room1.y+1 end
+		if room1.y+room1.h<room2.y+room2.h then maxy=room1.y+room1.h-1 else maxy=room2.y+room2.h-1 end
+		local y=math.random(miny,maxy)
+		room1.conn[room2]={0,y-room1.y}
+		room2.conn[room1]={room2.w,y-room2.y}
+	elseif room1.y>room2.y+room2.h then -- room1 down of room2
+		local minx,maxx
+		if room1.x<room2.x then minx=room2.x+1 else minx=room1.x+1 end
+		if room1.x+room1.w<room2.x+room2.w then maxx=room1.x+room1.w-1 else maxx=room2.x+room2.w-1 end
+		local x=math.random(minx,maxx)
+		room1.conn[room2]={x-room1.x,0}
+		room2.conn[room1]={x-room2.x,room2.h}
+	elseif room2.x>room1.x+room1.w then -- room1 left of room2
+		local miny,maxy
+		if room1.y<room2.y then miny=room2.y+1 else miny=room1.y+1 end
+		if room1.y+room1.h<room2.y+room2.h then maxy=room1.y+room1.h-1 else maxy=room2.y+room2.h-1 end
+		local y=math.random(miny,maxy)
+		room1.conn[room2]={room1.w,y-room1.y}
+		room2.conn[room1]={0,y-room2.y}
+	else -- room1 up of room2
+		local minx,maxx
+		if room1.x<room2.x then minx=room2.x+1 else minx=room1.x+1 end
+		if room1.x+room1.w<room2.x+room2.w then maxx=room1.x+room1.w-1 else maxx=room2.x+room2.w-1 end
+		local x=math.random(minx,maxx)
+		room1.conn[room2]={x-room1.x,room1.h}
+		room2.conn[room1]={x-room2.x,0}
+	end
+end
+
+function disconnect(room1,room2)
+	room1.conn[room2]=nil
+	room2.conn[room1]=nil
+end
+
+function split_once(dungeon,minw,minh,spacing)
+	local room=dungeon[math.random(1,#dungeon)]
+	local d=room.h-room.w
+	local timeout=0
+	while (room.w<minw*2+4+spacing+1 and d<=0) or (room.h<minh*2+4+spacing+1 and d>=0) do
+		if timeout>20 then return end
+		room=dungeon[math.random(1,#dungeon)]
+		d=room.h-room.w
+		timeout=timeout+1
+	end
+
+	if d>0 then
+		local split_y=math.random(0,room.h-(minh*2+4+spacing))+spacing+2+minh
+		local prev_h=room.h
+		room.h=split_y-spacing
+		local new_room={x=room.x,y=room.y+room.h+spacing,w=room.w,h=prev_h-room.h-spacing,conn={}}
+		table.insert(dungeon,new_room)
+		for c_room,conn in pairs(room.conn) do
+			if c_room.y>room.y+room.h then
+				disconnect(c_room,room)
+				connect_rooms(c_room,new_room)
+			end
+		end
+		connect_rooms(room,new_room)
+	else
+		local split_x=math.random(0,room.w-(minw*2+4+spacing))+spacing+2+minw
+		local prev_w=room.w
+		room.w=split_x-spacing
+		local new_room={x=room.x+room.w+spacing,y=room.y,w=prev_w-room.w-spacing,h=room.h,conn={}}
+		table.insert(dungeon,new_room)
+		for c_room,conn in pairs(room.conn) do
+			if c_room.x>room.x+room.w then
+				disconnect(c_room,room)
+				connect_rooms(c_room,new_room)
+			end
+		end
+		connect_rooms(room,new_room)
+	end
+	for other,coord in pairs(room.conn) do
+		if can_connect(room,other) then
+			connect_rooms(room,other)
+		else
+			disconnect(room,other)
+		end
+	end
+end
+
+function dungeon_generator(xmax,ymax,spacing)
+	local rooms=init_dungeon(0,0,xmax,ymax)
+	spacing=spacing or 3
+	for i=1,30 do
+		split_once(rooms,4,4,spacing)
+	end
+
+	local map={}
+
+	for k,room in pairs(rooms) do
+		square_room(map,room_palettes.default,room.x,room.y,room.x+room.w,room.y+room.h,room.conn)
+		for k,conn in pairs(room.conn) do
+			local dir
+			if conn[1]==0 then dir="l"
+			elseif conn[1]==room.w then dir="r"
+			elseif conn[2]==0 then dir="u"
+			else dir="d"
+			end
+			straight_corridor(map,room_palettes.default,room.x+conn[1],room.y+conn[2],dir,spacing//2)
+		end
+	end
+
 	return map
 end
 
@@ -437,11 +541,11 @@ function map_iso(x,y,w,h,sx,sy)
 					end
 					if is_visible(ix,iy) == "was visible" then
 						if fget(sprite,FLOOR_BLOCK) then
-							spr_iso(263,dx+sx,dy+sy,0,1,0,0,2,2)
+							spr_iso(400,dx+sx,dy+sy,0,1,0,0,2,2)
 						elseif fget(sprite,HALF_BLOCK) then
-							spr_iso(261,dx+sx,dy+sy,0,1,0,0,2,2,1)
+							spr_iso(402,dx+sx,dy+sy,0,1,0,0,2,2,1)
 						elseif fget(sprite,FULL_BLOCK) then
-							spr_iso(259,dx+sx,dy+sy,0,1,0,0,2,3,1) 
+							spr_iso(388,dx+sx,dy+sy,0,1,0,0,2,3,1) 
 						end
 					end
 				end
@@ -649,7 +753,7 @@ end
 function can_see(x0,y0,x1,y1)
 	local arr=plot_line(x0,y0,x1,y1)	
 	for k,v in pairs(arr) do
-		if fget(iso_mget(v[1],v[2]),OPAQUE_FLAG) and not (x1==v[1] and y1==v[2]) then
+		if (fget(iso_mget(v[1],v[2]),OPAQUE_FLAG) and not (x1==v[1] and y1==v[2])) or not fget(iso_mget(v[1],v[2]), DRAW_FLAG) then
 			return false
 		end
 	end
