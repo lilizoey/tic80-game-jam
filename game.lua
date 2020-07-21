@@ -520,7 +520,6 @@ function map_iso(x,y,w,h,sx,sy)
 			end
 		end
 	end
-	tick()
 end
 
 function iso_mget(x,y,map)
@@ -1015,6 +1014,30 @@ function create_door(x,y,flip)
 	return door
 end
 
+-- shop
+
+function create_pedestal(x,y,sprite,item_name,price,f,head,conversation)
+	local pedestal = Object.new({
+		x=x,y=y,sprite=sprite,f=f,bought=false
+	})
+
+	conversation=conversation or Conversation.new()
+	conversation.add_dialogue(Choice.new(head or 0,SIDE_RIGHT,"Buy "..item_name.." for "..price.."Ç?",sfx_slime_girl_voice,f,function() end))
+
+	function pedestal:hit()
+		if not self.bought then
+			start_conversation(conversation)
+		end
+	end
+
+	function pedestal:draw()
+		local x,y=calc_iso(x,y)
+		spr_iso(sprite,x,y,0,1,0,0,2,3,1)
+	end
+
+	return pedestal
+end
+
 --- ui
 -- ui elements
 
@@ -1053,10 +1076,10 @@ function wrap(str, limit, indent, indent1)
 	return indent1..str:gsub("(%s+)()(%S+)()", check)
 end
 
-local SIDE_LEFT=0
-local SIDE_RIGHT=1
+SIDE_LEFT=0
+SIDE_RIGHT=1
 
-local Dialogue={
+Dialogue={
 	mt={},
 	pt={margin=5,text_margin=2,rows=3,sprite=3}
 }
@@ -1154,7 +1177,74 @@ function Dialogue.pt:is_complete()
 	return not self.lines[(self.index-1)*self.rows+1]
 end
 
-local Conversation={
+Choice={
+	mt={},
+	pt=setmetatable({rows=2,selection_sprite=248,super=Dialogue.pt},Dialogue.mt)
+}
+
+function Choice.mt.__index(t,k) return Choice.pt[k] end
+
+function Choice.new(head,side,text,sound,accept_callback,deny_callback)
+	local choice = setmetatable({
+		text=text,accept_callback=accept_callback,deny_callback=deny_callback,
+		confirm_length=font("yes",0,-8),deny_length=font("no",0,-8),confirm=true,
+		complete=false,
+		head=head,side=side,sound=sound,
+	},Choice.mt)
+	return choice
+end
+
+function Choice.pt:draw()
+	local x,y,w,h=self:dimensions()
+	local sx,sy,sw,sh=self:sprite_dimensions()
+
+	rect(x,y,w,h,0)
+	rectb(x,y,w,h,12)
+	spr(self.head,sx+self.text_margin,sy+self.text_margin,0,self.sprite,self.side)
+	
+	local tx,ty=self:text_start(1)
+	font(self.text,tx+sw*self.side,ty,0)
+
+	local rel=self:text_space()/5
+	local tx,ty=self:text_start(3)
+	self:draw_choice("yes",tx+rel,ty,self.confirm)
+	self:draw_choice("no",tx+rel*4-self.deny_length,ty,not self.confirm)
+end
+
+function Choice.pt:draw_choice(text,x,y,selected)
+	local len=font(text,x+9,y)
+	if selected then
+		spr(self.selection_sprite,x,y)
+		spr(self.selection_sprite,x+len+10,y,0,1,1)
+	end
+end
+
+function Choice.pt:text_height()
+	return self.super.text_height(self)+9
+end
+
+function Choice.pt:next()
+	if self.confirm then
+		self.accept_callback()
+	else
+		self.deny_callback()
+	end
+	return true
+end
+
+function Choice.pt:swap()
+	self.confirm=not self.confirm
+end
+
+function Choice.pt:dimensions()
+	return self.margin,136-self.margin-self:text_height(),220-self.margin*2,self:text_height()
+end
+
+function Choice.pt:is_complete()
+	return self.complete
+end
+
+Conversation={
 	mt={},
 	pt={}
 }
@@ -1186,14 +1276,40 @@ end
 function Conversation.pt:next()
 	if self:get_dialogue():next() then
 		self.current_dialogue=self.current_dialogue+1
-		if self:get_dialogue() then self:get_dialogue().sound() end
+		if self:get_dialogue() then 
+			self:get_dialogue().sound() 
+			sfx_stop_after(60)
+		end
+	end
+end
+
+function Conversation.pt:swap()
+	if self:get_dialogue().swap then
+		self:get_dialogue():swap()
 	end
 end
 
 local current_conversation=Conversation.new()
-current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills.",sfx_demon_girl_voice))
-current_conversation:add_dialogue(Dialogue.new(401,SIDE_RIGHT,"I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. ",sfx_slime_girl_voice))
-current_conversation:add_dialogue(Dialogue.new(400,SIDE_LEFT,"I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words. ",sfx_demon_girl_voice))
+current_conversation:add_dialogue(Dialogue.new(476,SIDE_LEFT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills.",sfx_demon_girl_voice))
+current_conversation:add_dialogue(Dialogue.new(473,SIDE_RIGHT,"I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. ",sfx_slime_girl_voice))
+current_conversation:add_dialogue(Dialogue.new(476,SIDE_LEFT,"I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words. ",sfx_demon_girl_voice))
+current_conversation:add_dialogue(Choice.new(473,SIDE_RIGHT,"buy for 10?",sfx_slime_girl_voice,function() trace("yes") end, function() trace("no") end))
+
+-- main menu
+
+local new_game_len=font("new game",0,-8)
+
+function draw_title(x,y)
+	spr(167,x-(9/2)*8,y,0,1,0,0,9,4)
+	spr(232,x-(9/2)*8+8,y+4*8,0,1,0,0,7,1)
+end
+
+function draw_new_game(x,y)
+	font("new game", x-new_game_len/2,y,0)
+	if (a_ticks//18)%2==0 then return end
+	spr(248,x-new_game_len/2-10,y)
+	spr(248,x+new_game_len/2+2,y,0,1,1)
+end
 
 -- main
 
@@ -1202,7 +1318,7 @@ room_palettes.default.enemies=enemy_palettes.default
 
 local playing_music=false
 sample_map = dungeon_generator(40,40,6)
-local state = "game"
+local state = "mainmenu"
 local state_stack = {}
 local states
 
@@ -1252,6 +1368,9 @@ states={
 			if btnp(4) then
 				states[state].conversation:next()
 			end
+			if btnp(2) or btnp(3) then
+				states[state].conversation:swap()
+			end
 			if states[state].conversation:is_complete() then
 				pop_state()
 			end
@@ -1264,6 +1383,18 @@ states={
 		end,
 		music=function() end,
 		conversation=nil
+	},
+	mainmenu={
+		update=function()
+			if btnp(4) then swap_state("game") end
+		end,
+		draw=function()
+			cls()
+			draw_title(220//2,32)
+			draw_new_game(220//2,80)
+		end,
+		hud=function() end,
+		music=function() end,
 	}
 }
 
@@ -1283,6 +1414,7 @@ function TIC()
 	states[state].draw()
 	final_draw()
 	sfx_tick()
+	tick()
 end
 
 -- <TILES>
