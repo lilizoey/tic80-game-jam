@@ -399,14 +399,15 @@ function dungeon_generator(xmax,ymax,spacing,dungeon_palette)
 	local shop_generated=false
 	dungeon_palette=dungeon_palette or dungeon_palettes.default
 	for i=1,math.random((xmax*ymax)//20-5,(xmax*ymax)//20+5) do
-		split_once(rooms,4,4,spacing)
+		split_once(rooms,5,5,spacing)
 	end
 
 	local map={}
 
-	for k,room in pairs(rooms) do
+	for i=#rooms,1,-1 do
+		local room=rooms[i]
 		local palette=get_random_from_palette(dungeon_palette)
-		if room.w>11 and room.h>8 and not shop_generated then
+		if room.w>=9 and room.h>=6 and not shop_generated then
 			shop_room(map,room_palettes.shop_room,room.x,room.y,room.x+room.w,room.y+room.h,room.conn)
 			shop_generated=true
 		else
@@ -864,6 +865,10 @@ local player=Object.new({
 		tick=0,max=80,
 		frames={{i=0,t=40},{i=1,t=10},{i=2,t=10},{i=0,t=10},{i=3,t=10}}
 	},
+	items={
+		health_pots=0,
+		weapon_up=false,
+	}
 })
 
 function player:get_frame()
@@ -908,6 +913,12 @@ function player:do_turn()
 		did_move=true
 	end
 
+	if not did_move and btnp(5) and self.items.health_pots > 0 then
+		self.items.health_pots=self.items.health_pots - 1
+		self.hp=self.hp+2
+		if self.hp>self.max_hp then self.hp=self.max_hp end
+	end
+
 	return did_move
 end
 
@@ -925,8 +936,19 @@ function player:draw()
 	end
 end
 
+function player:hud(x,y)
+	for i=1,self.items.health_pots do
+		spr(385,x+(i-1)*9,y,0)
+	end
+	if self.items.weapon_up then
+		spr(390,x,y+9,0)
+	end
+end
+
 function player:attack(obj)
-	local res = obj:hit(1,self)
+	local dmg = 1
+	if self.items.weapon_up then dmg=2 end
+	local res = obj:hit(dmg,self)
 	if res then self.money=self.money+res end
 end
 
@@ -948,6 +970,14 @@ function player:did_move()
 	sfx_footstep()
 end
 
+
+function player:add_item(item)
+	if item=="health" then
+		self.items.health_pots = self.items.health_pots+1
+	elseif item=="weapon" then
+		self.items.weapon_up = true
+	end
+end
 
 -- enemy code
 
@@ -1006,9 +1036,9 @@ function create_enemy(x,y,sprite,hp,atk,value)
 		return self.value
 	end
 
-	function enemy:hit()
+	function enemy:hit(dmg)
 		sfx_enemy_hit()
-		self.hp=self.hp-1
+		self.hp=self.hp-dmg
 		if self.hp<1 then
 			return self:die()
 		end
@@ -1297,6 +1327,7 @@ end
 function Conversation.pt:next()
 	if self:get_dialogue():next() then
 		self.current_dialogue=self.current_dialogue+1
+		trace(self.current_dialogue.." "..#self.dialogues)
 		if self:get_dialogue() then 
 			self:get_dialogue().sound() 
 			sfx_stop_after(60)
@@ -1308,6 +1339,14 @@ function Conversation.pt:swap()
 	if self:get_dialogue().swap then
 		self:get_dialogue():swap()
 	end
+end
+
+function Conversation.pt:copy()
+	local copy=Conversation.new()
+	for k,v in pairs(self.dialogues) do
+		copy.add_dialogue(v)
+	end
+	return copy
 end
 
 local current_conversation=Conversation.new()
@@ -1334,13 +1373,26 @@ end
 
 -- shop
 
+local cant_afford = Conversation.new()
+cant_afford:add_dialogue(Dialogue.new(258,SIDE_RIGHT,"sorry, you can't afford that. :( thing hello test ", sfx_slime_girl_voice))
+
 function create_pedestal(x,y,sprite,item_sprite,item_name,price,f,head,conversation)
 	local pedestal = Object.new({
 		x=x,y=y,sprite=sprite,item_sprite=item_sprite,f=f,bought=false
 	})
 
-	conversation=conversation or Conversation.new()
-	conversation:add_dialogue(Choice.new(head or 0,SIDE_RIGHT,"Buy "..item_name.." for "..price.."Ç?",sfx_slime_girl_voice,function() f() pedestal.bought=true end,function() end))
+	conversation=(conversation and conversation:copy()) or Conversation.new()
+	trace("a")
+	conversation:add_dialogue(Choice.new(head or 0,SIDE_RIGHT,"Buy "..item_name.." for \n"..price.."g?",sfx_slime_girl_voice,function() 
+		if price>player.money then
+			start_conversation(cant_afford)
+			return
+		end
+		conversation.current_dialogue=1
+		player.money=player.money-price
+		f() 
+		pedestal.bought=true 
+	end,function() conversation.current_dialogue=1 end))
 
 	function pedestal:hit(dmg,p)
 		if not p or not p.player then return end
@@ -1363,17 +1415,30 @@ function create_pedestal(x,y,sprite,item_sprite,item_name,price,f,head,conversat
 end
 
 local shop_items = {
-	debug_item={
-		sprite=385,
-		name="DEBUG",
-		price=10,
-		f=function()trace("bought debug") end,
-		conversation=Conversation.new()
+	{
+		sprite=253,
+		name="health potion",
+		price=20,
+		f=function() player.items.health_pots=player.items.health_pots+1 end,
+		conversation=Conversation.new(),
+		limit=2,
 	},
+	{
+		sprite=251,
+		name="weapon",
+		price=50,
+		f=function() player.items.weapon_up=true end,
+		conversation=Conversation.new(),
+		limit=1,
+	}
 }
 
 function create_random_pedestal(x,y)
-	local item = shop_items.debug_item
+	local item = shop_items[math.random(1,#shop_items)]
+	while item.limit==0 do
+		item = shop_items[math.random(1,#shop_items)]
+	end
+	item.limit=item.limit-1
 	return create_pedestal(x,y,7,item.sprite,item.name,item.price,item.f,258,item.conversation)
 end
 
@@ -1386,6 +1451,7 @@ function slime_girl(x,y,conversation)
 	})
 
 	function girl:draw()
+		if not is_visible(self.x,self.y) then return end
 		local ix,iy=calc_iso(self.x,self.y)
 		local frame = self.base_sprite + self.animation[(a_ticks//10)%#self.animation + 1]
 		spr_iso(frame,ix,iy,0,1,1,0,1,3,3)
@@ -1444,6 +1510,7 @@ states={
 		hud=function()
 			show_resource_bar(432,1,1,player.hp,player.max_hp)
 			show_money(384,1,18,player.money)
+			player:hud(0,32)
 		end,
 		music=function()
 			if not playing_music then
@@ -1467,7 +1534,7 @@ states={
 		draw=function()
 		end,
 		hud=function()
-			states[peek_state()].hud()
+			--states[peek_state()].hud()
 			states[state].conversation:draw()
 		end,
 		music=function() end,
