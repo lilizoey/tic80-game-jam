@@ -543,7 +543,8 @@ function map_iso(x,y,w,h,sx,sy)
 						sprite=animate(sprite)
 					end
 					local colorkey=0
-					if sprite>=7 and sprite<=11 then colorkey=8 end
+					if sprite>=9 and sprite<=11 then colorkey=8 end
+					if sprite==7 then colorkey=5 end
 					local dx,dy=calc_iso(ix,iy)
 					if fget(sprite,FLOOR_BLOCK) then
 						spr_iso(sprite,dx+sx,dy+sy,colorkey,1,0,0,2,2)
@@ -939,10 +940,10 @@ end
 
 function player:hud(x,y)
 	for i=1,self.items.health_pots do
-		spr(385,x+(i-1)*9,y,0)
+		spr(253,x+(i-1)*9,y,0)
 	end
 	if self.items.weapon_up then
-		spr(390,x,y+9,0)
+		spr(261,x,y+9,0)
 	end
 end
 
@@ -1097,13 +1098,13 @@ end
 -- ui logic
 
 function show_resource_bar(s,x,y,res,max_res)
-	for i=0,max_res-2,2 do
+	for i=0,max_res-1,1 do
 		local dx=res-i
-		spr(s,x+(i//2)*18,y,0,1,0,0,2,2)
-		if dx>=2 then
-			spr(s+2,x+(i//2)*18,y,0,1,0,0,2,2)
+		spr(s,x+i*18,y,8,1,0,0,2,2)
+		if dx>=1 then
+			spr(s+2,x+i*18,y,0,1,0,0,2,2)
 		elseif dx==1 then
-			spr(s+2,x+(i//2)*18,y,0,1,0,0,2,1)
+			spr(s+2,x+i*18,y,0,1,0,0,2,1)
 		end
 	end
 end
@@ -1377,7 +1378,7 @@ local slime_girl_conversation=Conversation.new()
 slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Hello and welcome to CrypTrip. How may I help you?",sfx_slime_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"What?",sfx_demon_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,".. Hm?",sfx_slime_girl_voice))
-slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh, hello my Damned Angel! <3",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh, hello my Damned Angel! \\",sfx_slime_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Sorry, long day, really tired.",sfx_slime_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"What are you doing here Jelly?",sfx_demon_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Just selling my soul to the highest bidder.",sfx_slime_girl_voice))
@@ -1395,7 +1396,7 @@ slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"He
 slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Yeah, I know. It's making it harder for us professional crypt delvers to be taken seriously.",sfx_demon_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Just because you earn money doing it doesn't make you better than them you know.",sfx_slime_girl_voice))
 slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"You know what I mean, dork.",sfx_demon_girl_voice))
-slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I do, Heathen. <3",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I do, Heathen. \\",sfx_slime_girl_voice))
 
 local hp_1_conversation=Conversation.new()
 hp_1_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh you want a red drink? Why's that?",sfx_slime_girl_voice))
@@ -1414,7 +1415,7 @@ hp_1_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEF
 hp_1_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Okay! Thank you for shopping at CrypTrip!",sfx_slime_girl_voice))
 
 local hp_1_conversation_yes_fail=Conversation.new()
-hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"As long as i'm living with you it'll be fine <3.",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"As long as i'm living with you it'll be fine \\.",sfx_demon_girl_voice))
 hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Okay, I'll take the health potion.",sfx_demon_girl_voice))
 hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You mean red drink, right? That'll be #= coin.",sfx_slime_girl_voice))
 hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Wait I have to pay!?",sfx_demon_girl_voice))
@@ -1456,7 +1457,7 @@ hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"
 
 local hp_2_conversation_no=Conversation.new()
 hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm just looking anyway.",sfx_demon_girl_voice))
-hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Why look at the potions when you can look at me. <3",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Why look at the potions when you can look at me. \\",sfx_slime_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm at work, Jelly.",sfx_demon_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Me too! I get a bonus if I can distract the enemy!",sfx_slime_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm your enemy?",sfx_demon_girl_voice))
@@ -1470,7 +1471,7 @@ hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh! "
 hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Maybe you shouldn't buy my stuff then?",sfx_slime_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Isn't that gonna cut into your paycheck or something?",sfx_demon_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Eh, if you kill him that won't matter anyway.",sfx_slime_girl_voice))
-hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Good luck my Damned Angel. <3",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Good luck my Damned Angel. \\",sfx_slime_girl_voice))
 hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Thanks, jelly.",sfx_demon_girl_voice))
 
 local wu_conversation=Conversation.new()
@@ -1501,7 +1502,7 @@ wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,
 wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yeah, you paid to get it for free!",sfx_slime_girl_voice))
 wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"...",sfx_demon_girl_voice))
 wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I love you.",sfx_demon_girl_voice))
-wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I love you too. <3",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I love you too. \\",sfx_slime_girl_voice))
 
 local wu_conversation_yes_fail=Conversation.new()
 wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Sure, whatever you say Jelly.",sfx_demon_girl_voice))
@@ -1515,7 +1516,7 @@ wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"M
 wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Flail.",sfx_demon_girl_voice))
 wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"*kiss*",sfx_slime_girl_voice))
 wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"*kiss*",sfx_demon_girl_voice))
-wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Ok, I'll be back Jelly. <3",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Ok, I'll be back Jelly. \\",sfx_demon_girl_voice))
 
 local wu_conversation_no=Conversation.new()
 
@@ -1566,9 +1567,9 @@ function create_pedestal(x,y,sprite,item_sprite,item_name,price,f,head,conversat
 	function pedestal:draw()
 		if not is_visible(self.x,self.y) then return end
 		local ix,iy=calc_iso(self.x,self.y)
-		spr_iso(self.sprite,ix,iy,8,1,0,0,2,2,2)
+		spr_iso(self.sprite,ix,iy,5,1,0,0,2,2,2)
 		if not self.bought then
-			spr_iso(self.item_sprite,ix+4,iy-4,0,1,0,0,1,1,8)
+			spr_iso(self.item_sprite,ix+4,iy-2,0,1,0,0,1,1,8)
 		end
 
 	end
@@ -1578,7 +1579,7 @@ end
 
 local shop_items = {
 	{
-		sprite=253,
+		sprite=385,
 		name="health potion",
 		price=30,
 		f=function() player.items.health_pots=player.items.health_pots+1 end,
@@ -1589,7 +1590,7 @@ local shop_items = {
 		limit=1,
 	},
 	{
-		sprite=253,
+		sprite=385,
 		name="health potion",
 		price=30,
 		f=function() player.items.health_pots=player.items.health_pots+1 end,
@@ -1600,7 +1601,7 @@ local shop_items = {
 		limit=1,
 	},
 	{
-		sprite=251,
+		sprite=390,
 		name="weapon",
 		price=90,
 		f=function() player.items.weapon_up=true end,
@@ -1768,8 +1769,8 @@ end
 -- 004:f0000000fff00000efeff000eeeeeff0eeeefeffeeeeeddfeeeddeefeddedeef
 -- 005:0000000f00000fff000fffee0fffefeefefeeeeedddeeeeeddeddeeededdedde
 -- 006:f0000000eff00000fefff000eeefeff0eeeeeeffeeeeeddfeeeddeffeddeefef
--- 007:888888878888877d88877ffe877fffff7ffe7fff777defff7de77ff7777ff77e
--- 008:78888888e77888887ff77888fffed778fff7eff7fffff777eff77ff7d77ed777
+-- 007:555555505555500955500998500998887a988888777998887de77998777ff779
+-- 008:05555555900555558990055588899005888889a78889977789977ff7977ed777
 -- 009:888888888888888888888888888888888888888888888888888888888888888f
 -- 010:88888888888888888888888888888888888888888888888888888888f8888888
 -- 011:888888878888877d88877ffe877fffff7ffe7fff777defff7de77ff7777ff77e
@@ -1781,8 +1782,8 @@ end
 -- 020:ddedeeefddeeeeefdeeeeeffddeeeeffdeeeeeefddeeeeefddeeefefdeeeeeff
 -- 021:ddeeeeefddeeeeefdeeeeeffdeeefeff0fffefef000ffeff00000fff0000000f
 -- 022:ddedeeefddeeefefdedeeeffddeefeffdeefeff0dfeff000dff00000d0000000
--- 023:77e77de70ed717770771f7e70e077ed7800f077788800e708888800088888880
--- 024:7ff77177777e7f10717de7707f1770f07770e00807f008880008888808888888
+-- 023:77e77de70ed717770771f7e70e077ed7500f077755500e705555500055555550
+-- 024:7ff77177777e7f10717de7707f1770f07770e00507f005550005555505555555
 -- 025:88888ff1888ff7fd8ff77f77011de777800f7f708880007e8888800188888880
 -- 026:1ff88888e77ff88877777ff8707ed11f77007008d77008881008888808888888
 -- 027:77e77de77ed717707771f7e07e777ed0777f777001777e70777e777707777177
@@ -1927,6 +1928,10 @@ end
 -- 017:4223300042223000323200003220000061150000511550005115500056165000
 -- 018:00a9aa84009aaa84009aa88900aaa989000aa99a009aaa990999aa990999aaa9
 -- 019:48899000c88890009898000088800000aa9900009aa990009aa890009a988000
+-- 033:cc000000c0000000cc000000c0000000c0000000c000000000000000c0000000
+-- 034:c000c000cc0cc000cc0cc0000c0c000000000000000000000000000000000000
+-- 035:000000000c00c000cccccc000c00c0000c00c000cccccc000c00c00000000000
+-- 036:0000c000c0cccc0c0cc0c0c00cc000000cc000000cc0c0c0c0cccc0c0000c000
 -- 037:0c0000c0c0c00cc00c00cc00000cc00000cc00000cc00c00cc00c0c0c0000c00
 -- 038:00ccc0000c0c0c000c000000c0c00000c00c0000c000c0c00c000c0000ccc0c0
 -- 039:0c000000cc000000cc000000c000000000000000000000000000000000000000
@@ -1982,7 +1987,7 @@ end
 -- 089:0c00ccccc0000cc0c0000cc00ccccccc00000cc00cc00cc0c000ccc00ccccc00
 -- 090:ccccccccc0c000cc000000cc00cc00c00c00cc00cc000000cc000c0ccccccccc
 -- 091:cccc00000c000000cc0000000c0000000c000000cc0000000c000000cccc0000
--- 092:cc000000cc0000000cc000000cc0000000cc000000cc0000000cc000000cc000
+-- 092:020200002c2330000233000000200000000020200002c2330000233000000200
 -- 093:cccc000000c0000000cc000000c0000000c0000000cc000000c00000cccc0000
 -- 094:000c000000ccc0000cc0cc00cc000cc0c00000c0000000000000000000000000
 -- 095:00000000000000000000000000000000000000000000000000000000cccccccc
@@ -2043,10 +2048,9 @@ end
 -- 173:0000000000000000000000000111c0001c1110002c1111004211110032111100
 -- 174:000dd00000dccd000dccd0000dcd00000dd00000000000000000000000000000
 -- 175:0000000000dd00000dccd000dccd0000dcccd0000ddcd000000dd00000000000
--- 176:0000000000000000000000110000110000010000000100000010000000111111
--- 177:0000000000000000110000000011000000001000000010000000010000000100
--- 178:0000000000000000000000000000003200003323000022320003232300000000
--- 179:0000000000000000000000003300000022330000222300002222300033333000
+-- 176:8888223288882000888820008888200088882000888830008888200088883000
+-- 177:2888888828888888388888882888888838888888388888883888888838888888
+-- 178:0000000000000ddf00000def00000df700000df700000def00000fe700000df7
 -- 180:0000001100000100000010000000100100010010000100100010010000100111
 -- 181:1100000000100000000100001001000001001000010010000010010011100100
 -- 182:00000000000000cc00000c4400000c400000c4000000c400000c4000000c4000
@@ -2057,10 +2061,10 @@ end
 -- 189:0311110001111500551115005611160062113200021162000262620032525300
 -- 190:0000000000dd00000dcd0000dccd00000dccd0000dcccd0000ddccd00000dd00
 -- 191:000000000000000000000000000d00000ddcd0000dcccd0000ddccd00000ddd0
--- 192:0010000000100000000100000001000000001100000000110000000000000000
--- 193:1111110000000100000010000000100000110000110000000000000000000000
--- 194:0002222200023333000023330000223300000022000000000000000000000000
--- 195:0000000033233000323200002322000032000000000000000000000000000000
+-- 192:2222300020000000200000003000000023233000888830008888300088883323
+-- 193:2222388800003888000028880000388823222888388888882888888828888888
+-- 194:00000fef0dddffef0dffeeee0f77f7e700000fef00000fe700000f7700000000
+-- 195:00000000dfd70000feef0000777f000000000000000000000000000000000000
 -- 196:0010000000100000001111100000100000001000000011100000001000000011
 -- 197:0000010000000100011111000001000000010000011100000100000011000000
 -- 198:000c4ccc000c44440000000c00000cc4000004440000000c0000000c00000000
