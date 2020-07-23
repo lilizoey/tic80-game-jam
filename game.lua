@@ -131,7 +131,7 @@ local enemy_palettes={
 local room_palettes={
 	default={full_wall=3,half_wall=5,floor={1,1,1,96},door=52,decor={32,64,50},enemy_frequency=0.02,enemies=enemy_palettes.default,extra={}},
 	mossy_room={full_wall=3,half_wall=5,floor={98,100,102,104},door=52,decor={},enemy_frequency=0,enemies={},extra={}},
-	shop_room={full_wall=11,half_wall=7,floor=9,door=52,decor={},enemy_frequency=0,enemies={},extra={}}
+	shop_room={full_wall=11,half_wall=7,floor={1,1,1,96},door=52,decor={},enemy_frequency=0,enemies={},extra={}}
 }
 
 local dungeon_palettes={
@@ -407,6 +407,7 @@ function dungeon_generator(xmax,ymax,spacing,dungeon_palette)
 	for i=#rooms,1,-1 do
 		local room=rooms[i]
 		local palette=get_random_from_palette(dungeon_palette)
+
 		if room.w>=9 and room.h>=6 and not shop_generated then
 			shop_room(map,room_palettes.shop_room,room.x,room.y,room.x+room.w,room.y+room.h,room.conn)
 			shop_generated=true
@@ -1196,6 +1197,7 @@ function Dialogue.pt:chunk_text(text)
 			line,line_len=v[1].." ",v[2]+8
 		end
 	end
+	if line~="" then table.insert(lines,{line,line_len}) end
 	self.lines=lines
 end
 
@@ -1216,7 +1218,7 @@ end
 
 function Dialogue.pt:next()
 	self.index=self.index+1
-	if not self.lines[(self.index-1)*self.rows+1] then
+	if (self.index-1)*self.rows + 1 > #self.lines then
 		return true
 	end
 	self.sound()
@@ -1226,6 +1228,10 @@ end
 
 function Dialogue.pt:is_complete()
 	return not self.lines[(self.index-1)*self.rows+1]
+end
+
+function Dialogue.pt:reset()
+	self.index=1
 end
 
 Choice={
@@ -1295,6 +1301,10 @@ function Choice.pt:is_complete()
 	return self.complete
 end
 
+function Choice.pt:reset()
+
+end
+
 Conversation={
 	mt={},
 	pt={}
@@ -1327,16 +1337,15 @@ end
 function Conversation.pt:next()
 	if self:get_dialogue():next() then
 		self.current_dialogue=self.current_dialogue+1
-		trace(self.current_dialogue.." "..#self.dialogues)
 		if self:get_dialogue() then 
-			self:get_dialogue().sound() 
+			self:get_dialogue().sound()
 			sfx_stop_after(60)
 		end
 	end
 end
 
 function Conversation.pt:swap()
-	if self:get_dialogue().swap then
+	if self:get_dialogue() and self:get_dialogue().swap then
 		self:get_dialogue():swap()
 	end
 end
@@ -1349,11 +1358,166 @@ function Conversation.pt:copy()
 	return copy
 end
 
-local current_conversation=Conversation.new()
-current_conversation:add_dialogue(Dialogue.new(256,SIDE_LEFT,"What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills.",sfx_demon_girl_voice))
-current_conversation:add_dialogue(Dialogue.new(258,SIDE_RIGHT,"I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. ",sfx_slime_girl_voice))
-current_conversation:add_dialogue(Dialogue.new(256,SIDE_LEFT,"I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words. ",sfx_demon_girl_voice))
-current_conversation:add_dialogue(Choice.new(258,SIDE_RIGHT,"buy for 10?",sfx_slime_girl_voice,function() trace("yes") end, function() trace("no") end))
+function Conversation.pt:reset()
+	self.current_dialogue=1
+	for k,v in pairs(self.dialogues) do
+		v:reset()
+	end
+end
+
+-- conversations
+
+local DEMON_GIRL_HEAD=256
+local SLIME_GIRL_HEAD=258
+
+local intro_conversation=Conversation.new()
+intro_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"This is my third dungeon today. Asmodeus, I can't wait to get home and spend some time with my gf.",sfx_demon_girl_voice))
+
+local slime_girl_conversation=Conversation.new()
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Hello and welcome to CrypTrip. How may I help you?",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"What?",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,".. Hm?",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh, hello my Damned Angel! <3",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Sorry, long day, really tired.",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"What are you doing here Jelly?",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Just selling my soul to the highest bidder.",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Haha, yeah.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"But seriously.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You remember the job I was talking about?",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Sure.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Well here I am, want some stuff?",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Uh, I guess? What do you have?",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"We have red drinks! And this nifty weapon!",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Pretty crap selection.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yeah, you'd imagine such a popular tourist destination would have a better selection.",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Yep, the popular tourist destination of deep down in a random crypt.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Hey, crypt delving has become a more popular pastime as of late!",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Yeah, I know. It's making it harder for us professional crypt delvers to be taken seriously.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Just because you earn money doing it doesn't make you better than them you know.",sfx_slime_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"You know what I mean, dork.",sfx_demon_girl_voice))
+slime_girl_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I do, Heathen. <3",sfx_slime_girl_voice))
+
+local hp_1_conversation=Conversation.new()
+hp_1_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh you want a red drink? Why's that?",sfx_slime_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"It's a health potion, right?",sfx_demon_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"No, it's a red drink. I have no idea as to what it's gonna do to you.",sfx_slime_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"...",sfx_demon_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"It could be juice for all I know, maybe wine. Why do you think I'd know what's in that?",sfx_slime_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Well you are selling it so I'd imagine you'd have some idea of what is in it.",sfx_demon_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Listen, I just work here.",sfx_slime_girl_voice))
+hp_1_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Well alrighty then.",sfx_demon_girl_voice))
+
+local hp_1_conversation_yes_success=Conversation.new()
+hp_1_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Okay, I'll take the health potion.",sfx_demon_girl_voice))
+hp_1_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You mean the red drink, right?",sfx_slime_girl_voice))
+hp_1_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Yeah, yeah sure. I'll take the \"Red Drink\"",sfx_demon_girl_voice))
+hp_1_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Okay! Thank you for shopping at CrypTrip!",sfx_slime_girl_voice))
+
+local hp_1_conversation_yes_fail=Conversation.new()
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"As long as i'm living with you it'll be fine <3.",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Okay, I'll take the health potion.",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You mean red drink, right? That'll be #= coin.",sfx_slime_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Wait I have to pay!?",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Well yeah, this is a store.",sfx_slime_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"But I'm your girlfriend!",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Love doesn't pay the bills.",sfx_slime_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"WE PAY THE SAME BILLS!",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yeah but my boss pays me and he'll only get money if I sell stuff so I don't get paid unless he gets paid which means you gotta pay.",sfx_slime_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Hmph.",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"So... That'll be 30 coin.",sfx_slime_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I don't have enough. Sorry, Jelly",sfx_demon_girl_voice))
+hp_1_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"It's okay. Hope you're fine with living in debt!",sfx_slime_girl_voice))
+
+local hp_1_conversation_no=Conversation.new()
+hp_1_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I think I'll pass. There could be anything in there as far as I know!",sfx_demon_girl_voice))
+hp_1_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"True! Better safe than sorry!",sfx_slime_girl_voice))
+
+local hp_2_conversation=Conversation.new()
+hp_2_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Woah calm down there, you sure you can handle my strongest potions?",sfx_slime_girl_voice))
+hp_2_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Haha. Very funny, potion seller.",sfx_demon_girl_voice))
+
+local hp_2_conversation_yes_success=Conversation.new()
+hp_2_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"One red drink coming up!",sfx_slime_girl_voice))
+hp_2_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Why would they be selling red drinks to adventurers if it's not a health potion?",sfx_demon_girl_voice))
+hp_2_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I dunno, maybe it makes you into a horse person or something.",sfx_slime_girl_voice))
+hp_2_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Wouldn't be the first time.",sfx_demon_girl_voice))
+
+local hp_2_conversation_yes_fail=Conversation.new()
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"My potions are too strong for you, traveller.",sfx_slime_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Jelly come on, I need a potion.",sfx_demon_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"My strongest potions would kill you, traveler. You can't handle my strongest potions. You'd better go to a seller that sells weaker potions.",sfx_slime_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Listen! I just need a single potion!",sfx_demon_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You can't handle my strongest potions! No one can! My strongest potions aren't fit for a beast let alone a girl!",sfx_slime_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"...Please?",sfx_demon_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You uh… don't have enough coin.",sfx_slime_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"You could have just said that!",sfx_demon_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Well it's a lot less fun to say \"you're too broke\".",sfx_slime_girl_voice))
+hp_2_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Heh, fair enough.",sfx_demon_girl_voice))
+
+local hp_2_conversation_no=Conversation.new()
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm just looking anyway.",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Why look at the potions when you can look at me. <3",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm at work, Jelly.",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Me too! I get a bonus if I can distract the enemy!",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I'm your enemy?",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"According to my contract, yeah.",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"But that's only when I'm on the clock!",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Ah.",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Wait, why are you selling me stuff if I'm your enemy?",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh, the boss gets a bonus if he can sell a lot of stuff, doesn't matter who buys it.",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I think my job is to kill that guy.",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh! ",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Maybe you shouldn't buy my stuff then?",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Isn't that gonna cut into your paycheck or something?",sfx_demon_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Eh, if you kill him that won't matter anyway.",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Good luck my Damned Angel. <3",sfx_slime_girl_voice))
+hp_2_conversation_no:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Thanks, jelly.",sfx_demon_girl_voice))
+
+local wu_conversation=Conversation.new()
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Oh! You hadn't told me you liked maces!",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Maces?",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yes, that's what i call flails.",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"You call flails \"maces\"?",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yes, it's a regional dialect.",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"What region?",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Hell.",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Really? Well I'm from the Second Level of Hell and I've never heard anyone call flails \"maces\".",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Wait, really? I thought you were from The Abyss?",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"No, Jelly, I'm just going along with the joke.",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"What, oh! Right, from The Shimshons!",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Yes- Wait you weren't making that joke?",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Nope, pure coincidence!",sfx_slime_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Uh huh.",sfx_demon_girl_voice))
+wu_conversation:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Anyway want this mace?",sfx_slime_girl_voice))
+
+local wu_conversation_yes_success=Conversation.new()
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Woah, wait a minute... Where did you get all this money from?",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Those skeletons were attacking me and dropped it when they died.",sfx_demon_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"You killed my co-workers?",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Oh, crap sorry-",sfx_demon_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Haha, just kidding, they'll be back. Undead y'know.",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Here, have the flail. It's on the house.",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I paid for it.",sfx_demon_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Yeah, you paid to get it for free!",sfx_slime_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"...",sfx_demon_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"I love you.",sfx_demon_girl_voice))
+wu_conversation_yes_success:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"I love you too. <3",sfx_slime_girl_voice))
+
+local wu_conversation_yes_fail=Conversation.new()
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Sure, whatever you say Jelly.",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Great! That'll be 90!",sfx_slime_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Oh, Mammon! That's a lot!",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Duh, it's a mace.",sfx_slime_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Flail, but yeah i don't have that much.",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Mace. That's fine, you heretic, come back when you have more!",sfx_slime_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Flail.",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"Mace.",sfx_slime_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Flail.",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(SLIME_GIRL_HEAD,SIDE_RIGHT,"*kiss*",sfx_slime_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"*kiss*",sfx_demon_girl_voice))
+wu_conversation_yes_fail:add_dialogue(Dialogue.new(DEMON_GIRL_HEAD,SIDE_LEFT,"Ok, I'll be back Jelly. <3",sfx_demon_girl_voice))
+
+local wu_conversation_no=Conversation.new()
 
 -- main menu
 
@@ -1373,30 +1537,28 @@ end
 
 -- shop
 
-local cant_afford = Conversation.new()
-cant_afford:add_dialogue(Dialogue.new(258,SIDE_RIGHT,"sorry, you can't afford that. :( thing hello test ", sfx_slime_girl_voice))
-
-function create_pedestal(x,y,sprite,item_sprite,item_name,price,f,head,conversation)
+function create_pedestal(x,y,sprite,item_sprite,item_name,price,f,head,conversation,ys,yf,n)
 	local pedestal = Object.new({
 		x=x,y=y,sprite=sprite,item_sprite=item_sprite,f=f,bought=false
 	})
 
-	conversation=(conversation and conversation:copy()) or Conversation.new()
-	trace("a")
-	conversation:add_dialogue(Choice.new(head or 0,SIDE_RIGHT,"Buy "..item_name.." for \n"..price.."g?",sfx_slime_girl_voice,function() 
+	conversation:add_dialogue(Choice.new(head or 0,SIDE_RIGHT,"Buy "..item_name.." for \n"..price.."g?",sfx_slime_girl_voice,function()
 		if price>player.money then
-			start_conversation(cant_afford)
+			start_conversation(yf)
 			return
 		end
-		conversation.current_dialogue=1
+		start_conversation(ys)
 		player.money=player.money-price
-		f() 
-		pedestal.bought=true 
-	end,function() conversation.current_dialogue=1 end))
+		f()
+		pedestal.bought=true
+	end,function()
+		start_conversation(n)
+	end))
 
 	function pedestal:hit(dmg,p)
 		if not p or not p.player then return end
 		if not self.bought then
+			if conversation:is_complete() then conversation:reset() end
 			start_conversation(conversation)
 		end
 	end
@@ -1418,17 +1580,34 @@ local shop_items = {
 	{
 		sprite=253,
 		name="health potion",
-		price=20,
+		price=30,
 		f=function() player.items.health_pots=player.items.health_pots+1 end,
-		conversation=Conversation.new(),
-		limit=2,
+		conversation=hp_1_conversation,
+		yes_success=hp_1_conversation_yes_success,
+		yes_fail=hp_1_conversation_yes_fail,
+		no=hp_1_conversation_no,
+		limit=1,
+	},
+	{
+		sprite=253,
+		name="health potion",
+		price=30,
+		f=function() player.items.health_pots=player.items.health_pots+1 end,
+		conversation=hp_2_conversation,
+		yes_success=hp_2_conversation_yes_success,
+		yes_fail=hp_2_conversation_yes_fail,
+		no=hp_2_conversation_no,
+		limit=1,
 	},
 	{
 		sprite=251,
 		name="weapon",
-		price=50,
+		price=90,
 		f=function() player.items.weapon_up=true end,
-		conversation=Conversation.new(),
+		conversation=wu_conversation,
+		yes_success=wu_conversation_yes_success,
+		yes_fail=wu_conversation_yes_fail,
+		no=wu_conversation_no,
 		limit=1,
 	}
 }
@@ -1439,7 +1618,7 @@ function create_random_pedestal(x,y)
 		item = shop_items[math.random(1,#shop_items)]
 	end
 	item.limit=item.limit-1
-	return create_pedestal(x,y,7,item.sprite,item.name,item.price,item.f,258,item.conversation)
+	return create_pedestal(x,y,7,item.sprite,item.name,item.price,item.f,258,item.conversation,item.yes_success,item.yes_fail,item.no)
 end
 
 -- slime girl
@@ -1459,12 +1638,11 @@ function slime_girl(x,y,conversation)
 
 	function girl:hit(dmg,p)
 		if not p and not p.player then return end
-		start_conversation(self.conversation)
+		start_conversation(slime_girl_conversation)
 	end
 
 	return girl
 end
-
 
 -- main
 
@@ -1477,17 +1655,23 @@ local state = "mainmenu"
 local state_stack = {}
 local states
 
-function swap_state(new_state)
-	table.insert(state_stack,state)
+
+
+function swap_state(new_state,...)
+	table.insert(state_stack,{state,{...}})
 	state=new_state
 end
 
 function pop_state()
-	state=table.remove(state_stack)
+	local popped_state=table.remove(state_stack)
+	state=popped_state[1]
+	if state=="conversation" then
+		states[state].conversation=popped_state[2][1]
+	end
 end
 
 function peek_state()
-	return state_stack[#state_stack]
+	return state_stack[#state_stack][1]
 end
 
 states={
@@ -1496,7 +1680,6 @@ states={
 			clear_visible()
 			take_turns()
 			shadow_casting(player,6)
-			if btnp(4) then start_conversation(current_conversation) end
 		end,
 		draw=function()
 			cls()
@@ -1521,6 +1704,7 @@ states={
 	},
 	conversation={
 		update=function()
+			if not states[state].conversation then pop_state() end
 			if btnp(4) then
 				states[state].conversation:next()
 			end
@@ -1534,7 +1718,7 @@ states={
 		draw=function()
 		end,
 		hud=function()
-			--states[peek_state()].hud()
+			if not states[state].conversation then return end
 			states[state].conversation:draw()
 		end,
 		music=function() end,
@@ -1542,7 +1726,10 @@ states={
 	},
 	mainmenu={
 		update=function()
-			if btnp(4) then swap_state("game") end
+			if btnp(4) then 
+				swap_state("game")
+				start_conversation(intro_conversation)
+			end
 		end,
 		draw=function()
 			cls()
@@ -1555,7 +1742,8 @@ states={
 }
 
 function start_conversation(conversation)
-	swap_state("conversation")
+	if conversation:is_complete() then conversation:reset() end
+	swap_state("conversation",conversation)
 	states[state].conversation=conversation
 end
 
