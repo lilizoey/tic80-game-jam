@@ -1638,7 +1638,7 @@ function slime_girl(x,y,conversation)
 	end
 
 	function girl:hit(dmg,p)
-		if not p and not p.player then return end
+		if not p or not p.player then return end
 		start_conversation(slime_girl_conversation)
 	end
 
